@@ -6,6 +6,7 @@ from orchestrator.persona import get_persona
 from shared.image_gen import is_photo_request, request_photo
 from shared.logging import get_logger
 from shared.mood import MoodService, format_mood_for_prompt
+from shared.safety import check_prompt, refusal_message
 from shared.repositories.subscription_repo import EntitlementService
 from shared.repositories.user_repo import UserRepository
 from shared.repositories.voice_repo import VoiceRepository
@@ -30,6 +31,12 @@ def get_router() -> Router:
             return
         if user.age_verified_at is None:
             await message.answer("請先完成年齡驗證：/start")
+            return
+
+        # Hard safety check — block illegal/minor content before any LLM call.
+        safety = check_prompt(message.text, user_id=message.from_user.id)
+        if not safety.allowed:
+            await message.answer(refusal_message())
             return
 
         persona = get_persona()

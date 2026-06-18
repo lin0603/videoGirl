@@ -12,6 +12,7 @@ import random
 import re
 
 from shared.config import get_settings
+from shared.safety import check_image_prompt
 from workers.queue_client import enqueue_image_job
 
 _PHOTO_INTENT_RE = re.compile(
@@ -53,6 +54,10 @@ async def request_photo(
 
     base = _NSFW_PROMPT if nsfw else _SFW_PROMPT
     prompt = f"{base}, {extra_context}".rstrip(", ") if extra_context else base
+
+    # Safety check on the final prompt (catches injected illegal terms).
+    if not check_image_prompt(prompt, user_id=user_id).allowed:
+        return None
 
     return await enqueue_image_job(
         user_id=user_id,
