@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from orchestrator.core import respond
 from orchestrator.persona import get_persona
+from shared.image_gen import is_photo_request, request_photo
 from shared.logging import get_logger
 from shared.mood import MoodService, format_mood_for_prompt
 from shared.repositories.subscription_repo import EntitlementService
@@ -62,6 +63,14 @@ def get_router() -> Router:
             return
 
         await message.answer(reply_text)
+
+        # Detect photo-request intent; enqueue async image generation.
+        if is_photo_request(message.text):
+            job_id = await request_photo(message.from_user.id, nsfw=nsfw)
+            if job_id:
+                await message.answer("好的，稍等一下，我去拍一張給你 📸")
+            else:
+                logger.debug("photo_request_skipped_no_callback", telegram_id=message.from_user.id)
 
         if user.voice_enabled:
             try:
