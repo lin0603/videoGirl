@@ -43,6 +43,23 @@ def is_video_request(text: str) -> bool:
     return bool(_VIDEO_INTENT_RE.search(text))
 
 
+async def build_source_image_url(user_id: int) -> str | None:
+    """
+    Build the URL the 4090 worker can use to fetch the last generated photo.
+    Returns None if no photo is cached or callback URL is not configured.
+    """
+    from shared.config import get_settings
+    settings = get_settings()
+    base = settings.media_callback_url
+    if not base:
+        return None
+    # Strip the path; use the Coolify host with the internal photo endpoint.
+    from urllib.parse import urlparse
+    parsed = urlparse(base)
+    host = f"{parsed.scheme}://{parsed.netloc}"
+    return f"{host}/internal/photo/{user_id}"
+
+
 async def request_video(
     user_id: int,
     *,

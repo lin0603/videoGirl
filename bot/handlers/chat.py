@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from orchestrator.core import respond
 from orchestrator.persona import get_persona
 from shared.image_gen import is_photo_request, request_photo
-from shared.video_gen import is_video_request, request_video
+from shared.video_gen import build_source_image_url, is_video_request, request_video
 from shared.logging import get_logger
 from shared.mood import MoodService, format_mood_for_prompt
 from shared.safety import check_prompt, refusal_message
@@ -82,10 +82,7 @@ def get_router() -> Router:
 
         # Detect video-request intent (lower priority queue, fire-and-forget).
         if is_video_request(message.text):
-            # Video needs a source image — use a placeholder URL until we have
-            # a recent photo for the user. The feature degrades gracefully if
-            # no source_image_url is available.
-            source_url = getattr(user, "last_generated_image_url", None) or ""
+            source_url = await build_source_image_url(message.from_user.id)
             if source_url:
                 video_job_id = await request_video(
                     message.from_user.id,
@@ -93,12 +90,15 @@ def get_router() -> Router:
                     nsfw=nsfw,
                 )
                 if video_job_id:
-                    await message.answer("好，幫你生成一段小影片，需要幾分鐘，等我一下 🎬")
+                    await message.answer(
+                        "好，幫你生成一段小影片，需要幾分鐘，做好了我會傳給你 🎬"
+                    )
+                else:
+                    logger.debug("video_request_no_callback", telegram_id=message.from_user.id)
             else:
-                # No source image yet: generate a photo first, note the gap silently.
-                logger.debug(
-                    "video_request_no_source_image",
-                    telegram_id=message.from_user.id,
+                # No cached source photo — ask user to request a photo first.
+                await message.answer(
+                    "要幫你生成影片，先傳一張照片給你～你可以先跟我說「傳照片給我」😊"
                 )
 
         if user.voice_enabled:

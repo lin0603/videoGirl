@@ -656,6 +656,12 @@ async def media_done_callback(
             job.user_id,
             BufferedInputFile(data, filename=file.filename or "image.jpg"),
         )
+        # Cache photo bytes so subsequent video requests can use it as I2V source.
+        try:
+            from shared.media_store import store_last_photo
+            await store_last_photo(job.user_id, data)
+        except Exception:
+            pass  # non-critical; don't fail the delivery
     else:
         await bot.send_video(
             job.user_id,
@@ -665,3 +671,20 @@ async def media_done_callback(
     job.status = "done"
     await update_job(job)
     return {"ok": True, "job_id": job_id}
+
+
+@app.get("/internal/photo/{user_id}")
+async def get_last_photo(user_id: int, request: Request) -> bytes:
+    """
+    Serve the cached last photo for a user (used as I2V source image).
+    Protected by the same callback secret header.
+    Auth: Authorization: Bearer <media_callback_secret>
+    """
+    _verify_callback_secret(request)
+    from fastapi.responses import Response
+    from shared.media_store import get_last_photo_bytes
+
+    data = await get_last_photo_bytes(user_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="no cached photo for user")
+    return Response(content=data, media_type="image/jpeg")
