@@ -61,3 +61,34 @@ class UserRepository:
         user.nsfw_opt_in = opt_in
         await self.session.commit()
         return user
+
+    async def set_voice_enabled(self, telegram_id: int, enabled: bool) -> User | None:
+        user = await self.get_by_telegram_id(telegram_id)
+        if user is None:
+            return None
+        user.voice_enabled = enabled
+        await self.session.commit()
+        return user
+
+    async def set_voice_settings(
+        self,
+        telegram_id: int,
+        *,
+        provider: str | None = None,
+        speed: float | None = None,
+        reference_audio_url: str | None = None,
+        reference_audio_path: str | None = None,
+    ) -> User | None:
+        user = await self.get_by_telegram_id(telegram_id)
+        if user is None:
+            return None
+        if provider is not None:
+            user.voice_provider = provider
+        if speed is not None:
+            user.voice_speed = max(0.5, min(2.0, speed))
+        if reference_audio_url is not None:
+            user.voice_reference_audio_url = reference_audio_url
+        if reference_audio_path is not None:
+            user.voice_reference_audio_path = reference_audio_path
+        await self.session.commit()
+        return user

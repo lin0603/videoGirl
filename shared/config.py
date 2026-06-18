@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     ollama_base_url: str
     comfyui_base_url: str
     breezyvoice_base_url: str
+    breezyvoice_token: str = ""
     embedding_model: str
     model_name: str
     log_level: str = "INFO"

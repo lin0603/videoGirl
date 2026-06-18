@@ -27,6 +27,9 @@ def get_router() -> Router:
             "/help - 顯示說明\n"
             "/settings - 查看目前設定\n"
             "/toggle_nsfw - 切換 NSFW 開關\n"
+            "/voice_on - 開啟語音回覆\n"
+            "/voice_off - 關閉語音回覆\n"
+            "/voice_settings - 查看語音設定\n"
             "/reset - 清除對話狀態"
         )
 
@@ -66,5 +69,41 @@ def get_router() -> Router:
     async def cmd_reset(message: types.Message, state: FSMContext) -> None:
         await state.clear()
         await message.answer("已清除狀態。需要時請再輸入 /start。")
+
+    @router.message(Command("voice_on"))
+    async def cmd_voice_on(message: types.Message, session: AsyncSession) -> None:
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        await repo.set_voice_enabled(message.from_user.id, True)
+        await message.answer("已開啟語音回覆 🎙️ 從現在起我會用文字回覆後，再補上一段語音。")
+
+    @router.message(Command("voice_off"))
+    async def cmd_voice_off(message: types.Message, session: AsyncSession) -> None:
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        await repo.set_voice_enabled(message.from_user.id, False)
+        await message.answer("已關閉語音回覆 🔇 只會回文字囉。")
+
+    @router.message(Command("voice_settings"))
+    async def cmd_voice_settings(message: types.Message, session: AsyncSession) -> None:
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        enabled = "✅ 開啟" if user.voice_enabled else "❌ 關閉"
+        await message.answer(
+            f"🎙️ 語音設定\n"
+            f"狀態：{enabled}\n"
+            f"Provider：{user.voice_provider}\n"
+            f"語速：{user.voice_speed}\n"
+            f"參考音檔：{user.voice_reference_audio_url or '無'}"
+        )
 
     return router

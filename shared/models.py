@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, String
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -20,3 +20,10 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
+
+    # Voice settings (task #9 integration)
+    voice_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    voice_provider: Mapped[str] = mapped_column(String(32), default="edge-tts")
+    voice_speed: Mapped[float] = mapped_column(Float, default=1.0)
+    voice_reference_audio_url: Mapped[str | None] = mapped_column(String(1024))
+    voice_reference_audio_path: Mapped[str | None] = mapped_column(String(1024))

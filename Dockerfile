@@ -2,8 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install uv and curl for healthchecks.
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+# Install uv, curl for healthchecks, and ffmpeg for voice conversion.
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir uv
 
