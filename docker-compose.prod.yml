@@ -14,17 +14,11 @@ services:
       postgres_url: postgresql://videogirl:${POSTGRES_PASSWORD:-videogirl}@postgres:5432/videogirl
       redis_url: redis://redis:6379/0
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - postgres
+      - redis
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "uv", "run", "--python", "python3.11", "python", "-m", "shared.health"]
-      interval: 30s
-      timeout: 10s
-      start_period: 10s
-      retries: 3
+    # Coolify web-based healthchecks expect an HTTP path; this worker has none.
+    # The Dockerfile's HEALTHCHECK command handles container-level checks.
 
   postgres:
     image: pgvector/pgvector:pg16
