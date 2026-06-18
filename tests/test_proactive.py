@@ -75,7 +75,8 @@ async def test_care_prompt_selected_after_silence(db_session):
         telegram_id=402, username="tester", display_name="Tester"
     )
     user.age_verified_at = _utc_now()
-    user.timezone = "Etc/UTC"
+    # Choose a timezone where the current UTC time falls in the care-check window (11-21).
+    user.timezone = "Pacific/Auckland"
     await db_session.commit()
 
     mood = await MoodRepository(db_session).get_or_create(user.telegram_id, "xiaorou")

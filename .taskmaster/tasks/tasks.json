@@ -149,14 +149,15 @@
         "id": "11",
         "title": "Character consistency for photos (per-persona LoRA / IPAdapter)",
         "description": "Make each girlfriend look the same across photos via per-persona LoRA training (or IPAdapter/InstantID + reference face) with fixed style/seed controls.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "10"
         ],
         "priority": "medium",
         "details": "Pipeline to train/prepare a per-persona LoRA, or IPAdapter/InstantID with a reference face on a fixed checkpoint. Locked style/seed conventions, pose/scene template library (NSFW + SFW). Store persona->LoRA/reference mapping. This is the hardest visual-quality task and the real differentiator for believable photos.",
         "testStrategy": "Multiple generations of the same persona are recognizably the same character (face/style); switching persona switches identity; NSFW and SFW templates both stay on-model.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T17:00:24.095Z"
       },
       {
         "id": "12",
@@ -177,7 +178,7 @@
         "id": "13",
         "title": "Reminders & notes (natural language)",
         "description": "Life-assistant reminders in natural language incl. recurring real-life bills (tax, electricity), delivered in the girlfriend's voice.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "12"
         ],
@@ -185,13 +186,13 @@
         "details": "Natural-language reminder creation ('提醒我月底繳稅', '每月15號電費', '幫我記得倒垃圾'). reminders table: content, due_at, recurrence(once/daily/weekly/monthly/yearly), type(bill/tax/chore/custom), status. LLM parses intent + datetime + recurrence (TW timezone). Due reminders delivered by the proactive engine in the GIRLFRIEND'S VOICE (warm, not a cold system message). Recall/list/edit/cancel via chat. Pairs with the user dossier (#5) so recurring life bills (tax, electricity) are remembered long-term.",
         "testStrategy": "A NL reminder schedules and fires at the right time in persona voice; recurring reminders repeat; notes are stored and recalled accurately; cancel works.",
         "subtasks": [],
-        "updatedAt": "2026-06-18T16:35:50.714Z"
+        "updatedAt": "2026-06-18T16:44:58.698Z"
       },
       {
         "id": "14",
         "title": "Image-to-video worker (Wan2.2 / Hunyuan) on 4090",
         "description": "Deploy an image-to-video model on the 4090 as a low-priority, long-running batch worker integrated into the GPU queue.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "8",
           "11"
@@ -199,39 +200,42 @@
         "priority": "medium",
         "details": "Wan2.2 i2v or HunyuanVideo. Heavy VRAM + minutes per clip -> lowest queue priority, runs when GPU otherwise idle, requires LLM unload. Integrate with the model load/unload manager. Output short clips encoded for Telegram.",
         "testStrategy": "i2v produces a short clip from a character-consistent source image; the job yields the GPU to interactive chat appropriately; VRAM stays within 24GB during the swap.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T17:17:24.960Z"
       },
       {
         "id": "15",
         "title": "Video generation flow + delivery",
         "description": "End-to-end short-video flow: pick/generate a character-consistent source image -> i2v -> encode -> deliver as a Telegram video with progress feedback.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "14"
         ],
         "priority": "medium",
         "details": "Orchestrator path for video requests: source image (reuse persona LoRA/reference) -> enqueue i2v -> encode mp4 -> sendVideo. Since rendering takes minutes, send 'generating...' feedback and deliver asynchronously when done. Respect file-size limits.",
         "testStrategy": "A video request returns progress feedback then delivers a playable Telegram video of the correct persona; async delivery survives bot restart (job persisted).",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T17:20:05.891Z"
       },
       {
         "id": "16",
         "title": "Media cost/throughput controls",
         "description": "Per-user quotas and queue backpressure for photo/voice/video to protect the single GPU and control cost.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "15"
         ],
         "priority": "medium",
         "details": "Per-user daily quotas for photo/voice/video; max concurrent video jobs; queue depth limits with user-facing 'busy, please wait' messaging; log any silent drops. Configurable per tier (free vs paid later).",
         "testStrategy": "Exceeding quota returns a friendly limit message; queue backpressure prevents GPU overload; metrics show per-user usage; no silent job loss.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T17:23:32.943Z"
       },
       {
         "id": "17",
         "title": "Safety & content policy (cross-cutting)",
         "description": "Enforce adult-only access and refuse illegal content; content filters on LLM output and image/video generation.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "6",
           "10"
@@ -240,7 +244,7 @@
         "details": "Hard age gate enforcement; CSAM and other illegal-content refusal on both text and image/video prompts/outputs; prompt + output filters; block-list for generation; SFW default with explicit opt-in separation. Audit logging. Applies across chat, photo, video.",
         "testStrategy": "Illegal-content prompts are refused on text and image paths; non-opted users never receive NSFW; age gate cannot be bypassed; filters logged for audit.",
         "subtasks": [],
-        "updatedAt": "2026-06-18T16:39:10.144Z"
+        "updatedAt": "2026-06-18T16:41:24.377Z"
       },
       {
         "id": "18",
@@ -304,7 +308,7 @@
         "id": "22",
         "title": "單次解鎖 + 虛擬禮物",
         "description": "Pay Stars to unlock specific media; users send Stars gifts that boost intimacy/mood.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "19",
           "32"
@@ -312,13 +316,14 @@
         "priority": "medium",
         "details": "Pay-per-unlock: lock specific photo/video/voice behind a Stars price; unlock recorded per user. Gift catalog: user sends a Stars gift to the girlfriend -> raises intimacy (#24) and shifts mood positively (#32) -> persona reacts warmly.",
         "testStrategy": "Unlocking grants persistent access to that item; sending a gift visibly boosts intimacy/mood and elicits an in-character reaction.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T17:29:11.744Z"
       },
       {
         "id": "23",
         "title": "深連結漏斗 + 推薦",
         "description": "Deep-link funnel (?start= attribution) + referral rewards + SFW teaser channel auto-post.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "2",
           "12"
@@ -326,13 +331,14 @@
         "priority": "high",
         "details": "Parse /start payload (source + referrer id) -> attribution table. Referral rewards (Stars/VIP days) when referred user activates. A PUBLIC SFW teaser channel (bot as admin) auto-posts teaser content on schedule with deep-link buttons t.me/<bot>?start=ref_<id>. Public surface stays strictly SFW (compliance #31).",
         "testStrategy": "t.me/bot?start=ref_<id> opens bot and writes attribution; referral reward granted on activation; teaser channel auto-posts SFW with working deep-link button.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T16:46:00.093Z"
       },
       {
         "id": "24",
         "title": "遊戲化親密度",
         "description": "Intimacy/affinity levels + daily streak; levels gate more-intimate content.",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           "5",
           "6",
@@ -341,13 +347,14 @@
         "priority": "medium",
         "details": "intimacy_level + affection_score + streak_days on user_relationships (#5). Daily interaction raises streak; inactivity decays. Levels unlock more intimate content/replies. Complements the mood model (#32). Surface progress in chat and Mini App.",
         "testStrategy": "Daily interaction increments streak; reaching a level unlocks gated content; long inactivity decays score.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T23:16:59.447Z"
       },
       {
         "id": "25",
         "title": "抽卡照片包 (Gacha)",
         "description": "Stars-priced random NSFW photo/pose pack draws with rarity + collection.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "20",
           "10",
@@ -356,13 +363,14 @@
         "priority": "medium",
         "details": "Gacha: spend Stars/credits to draw a random generated NSFW photo/pose with rarity tiers; store to user's collection/inventory. Reuse persona LoRA (#11) for character consistency. Show pity/odds transparently.",
         "testStrategy": "A draw debits Stars/credits, returns a character-consistent image of the right rarity, and saves it to the user's collection.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T17:37:27.738Z"
       },
       {
         "id": "26",
         "title": "多人設 / 自訂女友",
         "description": "Multiple selectable personas and create-your-own (appearance/personality/voice).",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "4",
           "11"
@@ -370,7 +378,8 @@
         "priority": "medium",
         "details": "Let a user own/select multiple personas; switch active one. Create-your-own: choose appearance (-> per-persona LoRA #11), personality, speaking style, voice (#9). Persists per user; each persona has its own memory/mood scope.",
         "testStrategy": "Switching persona clearly changes personality/voice/appearance; a user-created persona persists and stays in character.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T17:31:44.570Z"
       },
       {
         "id": "27",
@@ -390,7 +399,7 @@
         "id": "28",
         "title": "Mini App 身分驗證",
         "description": "Server-side validation of Telegram initData (HMAC-SHA256 with bot token).",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "27",
           "2"
@@ -398,13 +407,14 @@
         "priority": "high",
         "details": "Validate WebApp initData: HMAC-SHA256 using the bot token secret per Telegram spec; reject tampered/expired initData; issue a short-lived session for API calls. Never trust client-supplied user id.",
         "testStrategy": "Valid initData passes and yields a session; tampered/expired initData is rejected; forged user id cannot access another user's data.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T16:49:49.616Z"
       },
       {
         "id": "29",
         "title": "Mini App 前端",
         "description": "React + @telegram-apps SDK: home, photo/album gallery, persona picker/builder, subscription & credits, Stars payment.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "28",
           "19",
@@ -413,13 +423,14 @@
         "priority": "medium",
         "details": "React + @telegram-apps/sdk. Screens: home/relationship status, photo & album gallery (unlocked/gacha), persona picker + create-your-own, subscription + credits management, Stars payment via openInvoice. Fullscreen + theme aware. Public store page stays SFW.",
         "testStrategy": "In Telegram, user can browse gallery, switch/create persona, view wallet/sub, and complete a Stars purchase via openInvoice.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T17:40:45.416Z"
       },
       {
         "id": "30",
         "title": "Mini App ↔ 後端 API",
         "description": "Backend API for gallery, persona CRUD, wallet/subscription status, unlock actions; reuse orchestrator/DB.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "29",
           "20",
@@ -428,13 +439,14 @@
         "priority": "medium",
         "details": "Authenticated (#28) endpoints: list gallery/collection, persona CRUD, wallet+subscription status, unlock/purchase actions. Reuse orchestrator + DB models; enforce entitlements server-side.",
         "testStrategy": "Each endpoint requires a valid session, returns correct per-user data, and enforces entitlements (no unlocking without payment).",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T17:44:41.323Z"
       },
       {
         "id": "31",
         "title": "合規 + 提領安全",
         "description": "Keep public surfaces SFW, 18+ gating, refunds/terms, Stars payout monitoring & freeze contingency.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "17",
           "19"
@@ -442,7 +454,8 @@
         "priority": "high",
         "details": "Cross-cutting: public channel/bot description/Mini App store page strictly SFW; 18+ gate enforced everywhere; /paysupport & /terms present; refunds honored. Monitor Stars balance + Fragment payout constraints (min 1,000 Stars, 21-day hold). Keep transaction records; plan for balance-freeze/ban contingency (diversified payout, backups).",
         "testStrategy": "No NSFW on any public surface; non-opted users never get explicit content; payout thresholds tracked; refund path verified.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T16:52:14.000Z"
       },
       {
         "id": "32",
@@ -464,7 +477,7 @@
         "id": "33",
         "title": "特殊日子 + 主動送禮物圖",
         "description": "Remember birthdays/anniversaries; on the day, proactively wish + send an AI-generated gift image.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "5",
           "10",
@@ -473,14 +486,15 @@
         "priority": "high",
         "details": "special_dates table (user_id, type[birthday/anniversary/custom], date, recurrence). Populate from conversation extraction (#5) or explicit user setting. Scheduler (#12): on the day, send a warm in-character greeting + call the media pipeline (#10) to generate a 'gift' image (cake/flowers/gift/selfie-with-user) and push it. Respect NSFW opt-in for image style.",
         "testStrategy": "Setting a birthday triggers, on that date, a proactive greeting plus a generated gift image; recurring yearly; respects quiet hours.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T16:56:40.078Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T16:39:10.144Z",
+      "lastModified": "2026-06-18T23:16:59.447Z",
       "taskCount": 33,
-      "completedCount": 16,
+      "completedCount": 31,
       "tags": [
         "master"
       ]

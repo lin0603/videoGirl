@@ -26,6 +26,12 @@ class User(Base):
     # Proactive engine (task #12)
     proactive_opt_out: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Gamification / intimacy (task #24)
+    intimacy_level: Mapped[int] = mapped_column(Integer, default=0)
+    affection_score: Mapped[float] = mapped_column(Float, default=0.0)
+    streak_days: Mapped[int] = mapped_column(Integer, default=0)
+    last_interaction_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Active persona (task #26) — slug references the in-code PERSONAS registry.
     active_persona_slug: Mapped[str] = mapped_column(String(64), default="xiaorou")
 

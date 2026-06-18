@@ -37,6 +37,7 @@ SYSTEM_TEMPLATE = Template(
 {% if memory_context %}關於使用者（請自然地記得並運用，別生硬複述）：
 {{ memory_context }}
 {% endif %}{% if mood_context %}{{ mood_context }}
+{% endif %}{% if intimacy_context %}{{ intimacy_context }}
 {% endif %}{% if nsfw_enabled and p.nsfw_level >= 2 %}使用者已開啟成人模式：你可以進行親密、情色的對話與描寫。{% else %}保持純愛、浪漫、撒嬌，但不要露骨的性描寫。{% endif %}
 {% if p.boundaries %}絕對禁止：{{ p.boundaries | join('、') }}。{% endif %}
 現在時間：{{ now }}（台灣時區）。"""
@@ -48,6 +49,7 @@ def build_system_prompt(
     *,
     memory_context: str = "",
     mood_context: str = "",
+    intimacy_context: str = "",
     nsfw_enabled: bool = False,
     now_tw: datetime | None = None,
 ) -> str:
@@ -56,6 +58,7 @@ def build_system_prompt(
         p=persona,
         memory_context=memory_context.strip(),
         mood_context=mood_context.strip(),
+        intimacy_context=intimacy_context.strip(),
         nsfw_enabled=nsfw_enabled,
         now=now,
     ).strip()

@@ -21,6 +21,7 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.classList.add("active");
     document.getElementById(`tab-${tabId}`).classList.add("active");
     if (tabId === "personas") loadPersonas();
+    if (tabId === "gallery") loadGallery();
     if (tabId === "wallet") loadWallet();
     if (tabId === "store") loadStore();
   });
@@ -122,6 +123,34 @@ async function switchPersona(slug, name) {
     tg?.showAlert?.(`已切換到 ${name}！`);
   } catch (err) {
     tg?.showAlert?.("切換失敗：" + err.message);
+  }
+}
+
+// ---- Gallery tab ----
+async function loadGallery() {
+  const list = document.getElementById("gallery-list");
+  const msg = document.getElementById("gallery-msg");
+  list.innerHTML = "";
+  msg.textContent = "載入中…";
+  try {
+    const items = await getJson("/api/gallery");
+    msg.textContent = items.length ? "" : "還沒有任何收藏，趕快去抽卡或解鎖吧！";
+    items.forEach((item) => {
+      const el = document.createElement("div");
+      el.className = "card-item";
+      const date = new Date(item.created_at).toLocaleDateString("zh-TW");
+      el.innerHTML = `
+        <div class="card-info">
+          <div class="card-title">${item.label}</div>
+          <div class="card-desc">${date}</div>
+        </div>
+        <span class="card-badge">${item.type === "gacha" ? "抽卡" : "解鎖"}</span>
+      `;
+      list.appendChild(el);
+    });
+  } catch (err) {
+    msg.textContent = "載入失敗：" + err.message;
+    msg.className = "hint error-text";
   }
 }
 

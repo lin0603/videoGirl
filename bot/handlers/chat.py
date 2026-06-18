@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from orchestrator.core import respond
 from orchestrator.persona import get_persona
 from shared.image_gen import is_photo_request, request_photo
+from shared.intimacy import IntimacyService, intimacy_prompt_line
 from shared.quota import check_queue_backpressure, check_quota, increment_quota
 from shared.video_gen import build_source_image_url, is_video_request, request_video
 from shared.logging import get_logger
@@ -58,6 +59,13 @@ def get_router() -> Router:
         )
         mood_context = format_mood_for_prompt(mood_phrase)
 
+        # Inject current intimacy level into the system prompt.
+        try:
+            progress = await IntimacyService(session).get_progress(message.from_user.id)
+            intimacy_context = intimacy_prompt_line(progress.level)
+        except Exception:
+            intimacy_context = ""
+
         try:
             reply_text = await respond(
                 message.from_user.id,
@@ -65,6 +73,7 @@ def get_router() -> Router:
                 persona,
                 nsfw=nsfw,
                 mood_context=mood_context,
+                intimacy_context=intimacy_context,
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("respond_failed", telegram_id=message.from_user.id, error=str(exc))
