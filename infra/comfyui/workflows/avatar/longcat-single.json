@@ -1,0 +1,7 @@
+{
+  "prompt": "A handsome classical Chinese literature teacher in traditional Hanfu stands in front of a green screen, holding a calligraphy brush, speaking naturally to the camera with a calm warm expression, stable upper body, education video style, clear face, natural lip sync.",
+  "cond_image": "mentorai_assets/teacher.png",
+  "cond_audio": {
+    "person1": "mentorai_assets/mentorai-smoke.mp3"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "_comment": "Models required by the workflows in ./workflows, grouped by ComfyUI models/ subdir. Used by provision-4090.sh when switching machines. Sizes are approximate.",
+  "comfyui_models_root": "ComfyUI/models",
+  "groups": {
+    "diffusion_models": [
+      "z_image_turbo_bf16.safetensors            # Z-Image T2I/I2I (main)",
+      "z-image-turbo-fp8-e4m3fn.safetensors      # Z-Image turbo fp8 (loose i2i)",
+      "wan2.2_i2v_high_noise_14B_Q5_K_M.gguf     # Wan2.2 I2V main",
+      "wan2.2_i2v_low_noise_14B_Q5_K_M.gguf",
+      "wan2.2_i2v_high_noise_14B_Q4_K_M.gguf     # Wan2.2 I2V low-VRAM",
+      "wan2.2_i2v_low_noise_14B_Q4_K_M.gguf",
+      "ltx-2.3-22b-dev-fp8.safetensors           # LTX 2.3 base (heavy)",
+      "10Eros_v1_fp8_transformer.safetensors     # LTX 10Eros teacher (stable, heavy)",
+      "10Eros_v1-Q3_K_S.gguf                      # LTX 10Eros smallest (unverified)"
+    ],
+    "vae": [
+      "ae.safetensors                            # Z-Image vae",
+      "wan_2.1_vae.safetensors                   # Wan2.2",
+      "LTX23_video_vae_bf16.safetensors          # LTX 2.3",
+      "qwen_image_vae.safetensors                # loose nsfw t2i",
+      "ema_vae_fp16.safetensors"
+    ],
+    "text_encoders": [
+      "qwen_3_4b.safetensors                     # Z-Image text encoder",
+      "umt5_xxl_fp8_e4m3fn_scaled.safetensors    # Wan2.2 text encoder",
+      "gemma_3_12B_it_fp4_mixed.safetensors      # LTX 2.3 text encoder",
+      "qwen_2.5_vl_7b_fp8_scaled.safetensors     # loose nsfw t2i"
+    ],
+    "controlnet": [
+      "Z-Image-Turbo-Fun-Controlnet-Union-2.1-2601-8steps.safetensors"
+    ],
+    "loras": [
+      "taiwanDollLikeness_v20.safetensors        # == /Volumes/External Disk/TaiwanDollLikeness.safetensors (144M, upload it)",
+      "Perky Tits.safetensors                    # nsfw t2i lora",
+      "high_noise_model.safetensors              # Wan2.2 lightx2v/seko (high)",
+      "low_noise_model.safetensors               # Wan2.2 lightx2v/seko (low)",
+      "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors",
+      "ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors"
+    ],
+    "upscale_models": [
+      "ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+      "seedvr2_ema_3b_fp16.safetensors           # loose nsfw t2i upscaler"
+    ],
+    "audio": [
+      "ltx-av-step-1751000_vocoder_24K.safetensors  # LTX talking vocoder"
+    ]
+  },
+  "custom_nodes": [
+    "https://github.com/city96/ComfyUI-GGUF              # UnetLoaderGGUF (Wan/LTX gguf)",
+    "https://github.com/rgthree/rgthree-comfy            # Power Lora Loader",
+    "https://github.com/Lightricks/ComfyUI-LTXVideo      # LTX 2.3 / 10Eros audio nodes",
+    "https://github.com/Fannovel16/comfyui_controlnet_aux # ControlNet preprocessors",
+    "# LongCat avatar nodes: install from the LongCat repo used in mentorAI (avatar/longcat-single.json)"
+  ],
+  "notes": [
+    "Big files (Wan 14B, LTX 22B) are tens of GB. Prefer rsync from the previous 4090 or the persistent /home/bygpu/public_disk over re-downloading.",
+    "TaiwanDollLikeness.safetensors lives locally at /Volumes/External Disk/ — upload to ComfyUI/models/loras.",
+    "Exact HF source repos are not pinned here; fill in as you confirm them."
+  ]
+}
