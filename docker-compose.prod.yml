@@ -3,9 +3,7 @@
 # No HTTP port is exposed because the bot communicates via Telegram's long-polling.
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/lin0603/videogirl:main
     container_name: videogirl-bot
     environment:
       # Override local dev defaults to use the compose service hostnames.
