@@ -226,8 +226,88 @@ async def list_personas(
     ]
 
 
+class SubscriptionStatusResponse(BaseModel):
+    is_vip: bool
+    expires_at: str | None  # ISO format or None
+
+
+class GalleryItemResponse(BaseModel):
+    type: str   # "gacha" or "unlock"
+    key: str    # rarity+scene_key (gacha) or item_key (unlock)
+    label: str
+    created_at: str
+
+
 class SwitchPersonaRequest(BaseModel):
     slug: str
+
+
+@router.get("/api/subscription/status")
+async def get_subscription_status(
+    user_id: int = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_db),
+) -> SubscriptionStatusResponse:
+    repo = UserRepository(session)
+    user = await repo.get_by_telegram_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    entitlements = EntitlementService(session)
+    is_vip = await entitlements.nsfw_allowed(user)
+    # Fetch subscription expiry.
+    from sqlalchemy import select
+    from shared.models import Subscription
+    result = await session.execute(
+        select(Subscription)
+        .where(Subscription.user_id == user_id, Subscription.status == "active")
+        .order_by(Subscription.current_period_end.desc())
+        .limit(1)
+    )
+    sub = result.scalar_one_or_none()
+    expires_at = sub.current_period_end.isoformat() if sub else None
+    return SubscriptionStatusResponse(is_vip=is_vip, expires_at=expires_at)
+
+
+@router.get("/api/gallery")
+async def get_gallery(
+    user_id: int = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_db),
+) -> list[GalleryItemResponse]:
+    """Return user's gacha draws and unlocks, most recent first (up to 50 items)."""
+    from sqlalchemy import select, union_all, literal
+    from shared.models import GachaDraw, Unlock
+
+    result_gacha = await session.execute(
+        select(GachaDraw)
+        .where(GachaDraw.user_id == user_id)
+        .order_by(GachaDraw.drawn_at.desc())
+        .limit(50)
+    )
+    result_unlock = await session.execute(
+        select(Unlock)
+        .where(Unlock.user_id == user_id)
+        .order_by(Unlock.unlocked_at.desc())
+        .limit(50)
+    )
+
+    items = []
+    rarity_label = {"R": "✨ 普通", "SR": "💎 稀有", "SSR": "🌟 超稀有"}
+    for draw in result_gacha.scalars():
+        items.append(GalleryItemResponse(
+            type="gacha",
+            key=f"{draw.rarity}:{draw.scene_key}",
+            label=f"{rarity_label.get(draw.rarity, draw.rarity)} — {draw.scene_key}",
+            created_at=draw.drawn_at.isoformat(),
+        ))
+    for unlock in result_unlock.scalars():
+        items.append(GalleryItemResponse(
+            type="unlock",
+            key=unlock.item_key,
+            label=f"🔓 {unlock.item_key}",
+            created_at=unlock.unlocked_at.isoformat(),
+        ))
+
+    items.sort(key=lambda x: x.created_at, reverse=True)
+    return items[:50]
 
 
 @router.post("/api/personas/switch")
