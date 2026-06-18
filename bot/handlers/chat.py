@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from orchestrator.core import respond
 from orchestrator.persona import get_persona
 from shared.image_gen import is_photo_request, request_photo
+from shared.quota import check_queue_backpressure, check_quota, increment_quota
 from shared.video_gen import build_source_image_url, is_video_request, request_video
 from shared.logging import get_logger
 from shared.mood import MoodService, format_mood_for_prompt
@@ -74,32 +75,45 @@ def get_router() -> Router:
 
         # Detect photo-request intent; enqueue async image generation.
         if is_photo_request(message.text):
-            job_id = await request_photo(message.from_user.id, nsfw=nsfw)
-            if job_id:
-                await message.answer("好的，稍等一下，我去拍一張給你 📸")
+            photo_quota = await check_quota(message.from_user.id, "image")
+            if not photo_quota.allowed:
+                await message.answer(photo_quota.reason or "今天照片已達上限，明天再傳喔 📸")
             else:
-                logger.debug("photo_request_skipped_no_callback", telegram_id=message.from_user.id)
+                job_id = await request_photo(message.from_user.id, nsfw=nsfw)
+                if job_id:
+                    await increment_quota(message.from_user.id, "image")
+                    await message.answer("好的，稍等一下，我去拍一張給你 📸")
+                else:
+                    logger.debug("photo_request_skipped_no_callback", telegram_id=message.from_user.id)
 
         # Detect video-request intent (lower priority queue, fire-and-forget).
         if is_video_request(message.text):
-            source_url = await build_source_image_url(message.from_user.id)
-            if source_url:
-                video_job_id = await request_video(
-                    message.from_user.id,
-                    source_image_url=source_url,
-                    nsfw=nsfw,
-                )
-                if video_job_id:
-                    await message.answer(
-                        "好，幫你生成一段小影片，需要幾分鐘，做好了我會傳給你 🎬"
-                    )
-                else:
-                    logger.debug("video_request_no_callback", telegram_id=message.from_user.id)
+            video_quota = await check_quota(message.from_user.id, "video")
+            bp = await check_queue_backpressure()
+            if not video_quota.allowed:
+                await message.answer(video_quota.reason or "今天影片已達上限，明天再試 🎬")
+            elif not bp.allowed:
+                await message.answer(bp.reason or "GPU 目前忙碌，請稍後再試 🎬")
             else:
-                # No cached source photo — ask user to request a photo first.
-                await message.answer(
-                    "要幫你生成影片，先傳一張照片給你～你可以先跟我說「傳照片給我」😊"
-                )
+                source_url = await build_source_image_url(message.from_user.id)
+                if source_url:
+                    video_job_id = await request_video(
+                        message.from_user.id,
+                        source_image_url=source_url,
+                        nsfw=nsfw,
+                    )
+                    if video_job_id:
+                        await increment_quota(message.from_user.id, "video")
+                        await message.answer(
+                            "好，幫你生成一段小影片，需要幾分鐘，做好了我會傳給你 🎬"
+                        )
+                    else:
+                        logger.debug("video_request_no_callback", telegram_id=message.from_user.id)
+                else:
+                    # No cached source photo — ask user to request a photo first.
+                    await message.answer(
+                        "要幫你生成影片，先傳一張照片給你～你可以先跟我說「傳照片給我」😊"
+                    )
 
         if user.voice_enabled:
             try:
