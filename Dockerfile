@@ -22,5 +22,5 @@ COPY . /app
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD uv run --python python3.11 python -m shared.health || exit 1
 
-# Default command placeholder: run the bot scaffold.
-CMD ["uv", "run", "--python", "python3.11", "python", "-m", "bot"]
+# Start migrations then the bot.
+CMD ["bash", "scripts/start.sh"]
