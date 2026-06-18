@@ -4,6 +4,7 @@
 services:
   app:
     image: ghcr.io/lin0603/videogirl:main
+    pull_policy: always
     container_name: videogirl-bot
     environment:
       # Override local dev defaults to use the compose service hostnames.
