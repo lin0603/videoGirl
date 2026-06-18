@@ -1,8 +1,14 @@
-from aiogram import Bot, Router, types
+from aiogram import Bot, F, Router, types
 from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.config import settings
 from shared.logging import get_logger
+
+
+def _is_admin(telegram_id: int) -> bool:
+    ids = {x.strip() for x in (settings.admin_telegram_ids or "").split(",") if x.strip()}
+    return str(telegram_id) in ids
 from shared.payments import (
     PRODUCTS,
     STARS_CURRENCY,
@@ -79,7 +85,7 @@ def get_router() -> Router:
 
         await query.answer(ok=True)
 
-    @router.message(lambda message: message.successful_payment is not None)
+    @router.message(F.successful_payment)
     async def on_successful_payment(
         message: types.Message,
         session: AsyncSession,
@@ -112,6 +118,10 @@ def get_router() -> Router:
         bot: Bot,
         session: AsyncSession,
     ) -> None:
+        if not _is_admin(message.from_user.id):
+            logger.warning("refund_denied_non_admin", telegram_id=message.from_user.id)
+            await message.answer("此指令僅限管理員使用。")
+            return
         parts = (message.text or "").split(maxsplit=1)
         if len(parts) < 2:
             await message.answer("用法：/refund_stars <telegram_payment_charge_id>")

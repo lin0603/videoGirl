@@ -25,6 +25,9 @@ def create_dispatcher() -> Dispatcher:
     dp.message.middleware(DbSessionMiddleware())
     dp.message.middleware(RateLimitMiddleware())
     dp.callback_query.middleware(DbSessionMiddleware())
+    # Stars payments: the pre_checkout handler needs a DB session too, or
+    # answerPreCheckoutQuery never runs and every payment is cancelled.
+    dp.pre_checkout_query.middleware(DbSessionMiddleware())
 
     dp.include_router(commands.get_router())
     dp.include_router(onboarding.get_router())

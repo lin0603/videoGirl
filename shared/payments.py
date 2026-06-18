@@ -7,6 +7,7 @@ from datetime import datetime
 from aiogram import Bot
 from aiogram.types import LabeledPrice, SuccessfulPayment
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.models import PaymentTransaction
@@ -101,7 +102,16 @@ class PaymentRepository:
         transaction.provider_payment_charge_id = payment.provider_payment_charge_id
         transaction.delivered_at = now
         transaction.updated_at = now
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError:
+            # Concurrent re-delivery of the same charge_id raced past the read
+            # above; the unique constraint caught it -> treat as already done.
+            await self.session.rollback()
+            existing = await self.get_by_charge_id(payment.telegram_payment_charge_id)
+            if existing is not None:
+                return existing, False
+            raise
         await self.session.refresh(transaction)
         return transaction, True
 
@@ -209,6 +219,8 @@ class StarsPaymentService:
         tx = await self.repo.get_by_charge_id(charge_id)
         if tx is None:
             raise PaymentValidationError("找不到可退款的付款紀錄。")
+        if tx.status == "refunded":
+            raise PaymentValidationError("這筆付款已經退款過了。")
         await bot.refund_star_payment(
             user_id=tx.user_id,
             telegram_payment_charge_id=charge_id,

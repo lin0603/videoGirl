@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     admin_secret_key: str = "change-me-in-production"
     admin_host: str = "0.0.0.0"
     admin_port: int = 8000
+    # Comma-separated Telegram user ids allowed to run admin bot commands
+    # (e.g. /refund_stars). Empty = nobody (refunds disabled via bot).
+    admin_telegram_ids: str = ""
 
     # --- Telegram Mini App public surface (tasks #27-#30) ---
     mini_app_allowed_origins: str = "*"

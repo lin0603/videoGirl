@@ -118,7 +118,7 @@ async def create_stars_invoice_link(
 def register_mini_app(app: FastAPI) -> None:
     origins = [
         origin.strip()
-        for origin in os.getenv("mini_app_allowed_origins", "*").split(",")
+        for origin in get_settings().mini_app_allowed_origins.split(",")
         if origin.strip()
     ] or ["*"]
 
