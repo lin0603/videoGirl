@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import hmac
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -609,3 +610,58 @@ async def delete_persona(
         raise HTTPException(status_code=404)
     await repo.delete_persona(session, persona)
     return _admin_redirect("/admin/personas")
+
+
+# ---------------------------------------------------------------------------
+# Internal media callback — called by the 4090 worker over Tailscale.
+# NOT protected by admin session (no browser cookie); uses Bearer token.
+# ---------------------------------------------------------------------------
+
+def _verify_callback_secret(request: Request) -> None:
+    expected = get_settings().media_callback_secret
+    if not expected:
+        raise HTTPException(status_code=503, detail="media callback not configured")
+    auth = request.headers.get("Authorization", "")
+    token = auth.removeprefix("Bearer ").strip()
+    if not hmac.compare_digest(token, expected):
+        raise HTTPException(status_code=401, detail="invalid callback secret")
+
+
+@app.post("/internal/media_done")
+async def media_done_callback(
+    request: Request,
+    job_id: str = Form(...),
+    file: UploadFile = File(...),
+) -> dict:
+    """
+    Receives completed media from the 4090 worker and delivers it to the user.
+    The bot instance is stored in request.app.state.bot during startup.
+    """
+    _verify_callback_secret(request)
+
+    from aiogram.types import BufferedInputFile
+    from workers.queue_client import get_job, update_job
+
+    job = await get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="job not found")
+
+    data = await file.read()
+    bot = getattr(request.app.state, "bot", None)
+    if bot is None:
+        raise HTTPException(status_code=503, detail="bot not available")
+
+    if job.job_type == "image":
+        await bot.send_photo(
+            job.user_id,
+            BufferedInputFile(data, filename=file.filename or "image.jpg"),
+        )
+    else:
+        await bot.send_video(
+            job.user_id,
+            BufferedInputFile(data, filename=file.filename or "video.mp4"),
+        )
+
+    job.status = "done"
+    await update_job(job)
+    return {"ok": True, "job_id": job_id}

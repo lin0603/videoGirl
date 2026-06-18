@@ -39,6 +39,7 @@ async def lifespan(app: FastAPI):
     dp = create_dispatcher()
     bot_task = asyncio.create_task(start_bot(shutdown_event, bot=bot, dp=dp))
     bot_task.add_done_callback(_exit_if_bot_dies)
+    app.state.bot = bot  # expose bot to /internal/media_done callback
 
     proactive = ProactiveEngine(bot)
     proactive.start()

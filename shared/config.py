@@ -66,6 +66,15 @@ class Settings(BaseSettings):
     mini_app_allowed_origins: str = "*"
     mini_app_init_data_max_age_seconds: int = 86400
 
+    # --- GPU media queue (task #8) ---
+    # URL workers POST completed media to (Tailscale-reachable Coolify endpoint).
+    # e.g. http://100.x.x.x:3000/internal/media_done
+    media_callback_url: str = ""
+    # Shared secret for /internal/media_done bearer auth.
+    media_callback_secret: str = ""
+    # Max retries before a job is dead-lettered.
+    media_max_retries: int = 3
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
