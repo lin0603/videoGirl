@@ -52,6 +52,8 @@ def get_router() -> Router:
             "/voice_list - 列出可選的語音類別\n"
             "/mood - 查看女友此刻心情\n"
             "/snooze - 暫停主動關心訊息\n"
+            "/birthday MM-DD - 設定你的生日\n"
+            "/anniversary MM-DD [說明] - 設定紀念日\n"
             "/remind <自然語言> - 新增生活提醒\n"
             "/reminders - 列出進行中的提醒\n"
             "/cancel_reminder <編號> - 取消提醒\n"
@@ -266,6 +268,75 @@ def get_router() -> Router:
             await message.answer("找不到這個提醒，或已經取消了。")
             return
         await message.answer(f"已取消提醒：{cancelled.content}")
+
+    @router.message(Command("birthday"))
+    async def cmd_birthday(message: types.Message, session: AsyncSession) -> None:
+        """Set the user's birthday: /birthday MM-DD  (e.g. /birthday 06-15)"""
+        from shared.special_dates import SpecialDateService
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        parts = (message.text or "").split(maxsplit=1)
+        if len(parts) < 2:
+            await message.answer("用法：/birthday MM-DD（例如 /birthday 06-15）")
+            return
+        raw = parts[1].strip()
+        try:
+            month_s, day_s = raw.split("-")
+            month, day = int(month_s), int(day_s)
+            if not (1 <= month <= 12 and 1 <= day <= 31):
+                raise ValueError
+        except ValueError:
+            await message.answer("格式錯誤，請用 MM-DD，例如 /birthday 06-15")
+            return
+        await SpecialDateService(session).upsert(
+            user_id=message.from_user.id,
+            date_type="birthday",
+            month=month,
+            day=day,
+            label="我的生日",
+            recurrent=True,
+        )
+        await message.answer(
+            f"✅ 記住了！你的生日是 {month:02d}/{day:02d}，到時候我會特別為你慶祝 🎂"
+        )
+
+    @router.message(Command("anniversary"))
+    async def cmd_anniversary(message: types.Message, session: AsyncSession) -> None:
+        """Set an anniversary: /anniversary MM-DD [description]"""
+        from shared.special_dates import SpecialDateService
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        parts = (message.text or "").split(maxsplit=2)
+        if len(parts) < 2:
+            await message.answer("用法：/anniversary MM-DD [說明]（例如 /anniversary 02-14 我們交往紀念日）")
+            return
+        raw = parts[1].strip()
+        label = parts[2].strip() if len(parts) > 2 else "我們的紀念日"
+        try:
+            month_s, day_s = raw.split("-")
+            month, day = int(month_s), int(day_s)
+            if not (1 <= month <= 12 and 1 <= day <= 31):
+                raise ValueError
+        except ValueError:
+            await message.answer("格式錯誤，請用 MM-DD，例如 /anniversary 02-14")
+            return
+        await SpecialDateService(session).upsert(
+            user_id=message.from_user.id,
+            date_type="anniversary",
+            month=month,
+            day=day,
+            label=label,
+            recurrent=True,
+        )
+        await message.answer(
+            f"✅ 記住了！{label}（{month:02d}/{day:02d}），到時候我一定會好好紀念的 💕"
+        )
 
     @router.message(Command("refer"))
     async def cmd_refer(message: types.Message) -> None:

@@ -22,6 +22,7 @@ from shared.models import CompanionMood, Reminder, User
 from shared.mood import MoodService, format_mood_for_prompt
 from shared.reminders import ReminderService
 from shared.repositories.mood_repo import MoodRepository
+from shared.special_dates import SpecialDateService
 from shared.repositories.user_repo import UserRepository
 from orchestrator.persona import build_system_prompt, get_persona
 from orchestrator.core import generate_reply
@@ -120,6 +121,14 @@ class ProactiveEngine:
                 "interval",
                 minutes=1,
                 id="reminder_tick",
+                replace_existing=True,
+            )
+            # Check special dates once per hour (e.g. birthdays).
+            self.scheduler.add_job(
+                self._special_dates_tick,
+                "interval",
+                hours=1,
+                id="special_dates_tick",
                 replace_existing=True,
             )
             self.scheduler.start()
@@ -305,3 +314,98 @@ class ProactiveEngine:
                 "今天還好嗎": "今天還好嗎？有我在陪你。",
             }
             return fallbacks.get(prompt.label, "在嗎？我想你了～")
+
+    async def _special_dates_tick(self) -> None:
+        async with self.session_factory() as session:
+            service = SpecialDateService(session)
+            due = await service.get_due_today()
+            logger.debug("special_dates_tick_due", count=len(due))
+            for sd in due:
+                try:
+                    await self._send_special_date_greeting(session, sd, service)
+                except Exception as exc:
+                    logger.error(
+                        "special_date_send_error",
+                        special_date_id=sd.id,
+                        user_id=sd.user_id,
+                        error=str(exc),
+                    )
+
+    async def _send_special_date_greeting(
+        self,
+        session: AsyncSession,
+        sd: "SpecialDate",  # noqa: F821
+        service: SpecialDateService,
+    ) -> None:
+        from shared.image_gen import request_photo
+
+        user = await UserRepository(session).get_by_telegram_id(sd.user_id)
+        if user is None or user.proactive_opt_out:
+            return
+
+        text = await self._generate_special_date_message(session, user, sd)
+        try:
+            await self.bot.send_message(sd.user_id, text)
+        except Exception as exc:
+            logger.error("special_date_message_failed", user_id=sd.user_id, error=str(exc))
+            return
+
+        # Queue a gift image (cake/flowers/gift) — fire-and-forget.
+        gift_prompts = {
+            "birthday": "birthday cake with candles flowers gift beautiful festive warm",
+            "anniversary": "romantic roses bouquet flowers anniversary card beautiful",
+            "custom": "gift box flowers celebration beautiful",
+        }
+        extra = gift_prompts.get(sd.date_type, gift_prompts["custom"])
+        await request_photo(sd.user_id, nsfw=False, extra_context=extra)
+
+        await service.mark_greeted(sd)
+        logger.info(
+            "special_date_greeted",
+            user_id=sd.user_id,
+            date_type=sd.date_type,
+            label=sd.label,
+        )
+
+    async def _generate_special_date_message(
+        self, session: AsyncSession, user: "User", sd: "SpecialDate"  # noqa: F821
+    ) -> str:
+        persona = get_persona("xiaorou")
+        memory = await build_memory_context(user.telegram_id, "")
+        mood_service = MoodService(session)
+        mood = await mood_service.get_mood(user.telegram_id, persona.slug)
+        mood_context = format_mood_for_prompt(mood.phrase)
+
+        if sd.date_type == "birthday":
+            instruction = (
+                f"今天是使用者的生日！以最溫柔、最真心的方式送上生日祝福（{sd.label}），"
+                "表達你的愛與珍惜，告訴他有你陪著他度過每一個生日，語氣充滿深情但不矯情。"
+            )
+        elif sd.date_type == "anniversary":
+            instruction = (
+                f"今天是你們的紀念日（{sd.label}）！真誠地表達你有多珍惜這段感情，"
+                "回憶一下你們在一起的美好，說說你對未來的期待，語氣溫柔感動。"
+            )
+        else:
+            instruction = (
+                f"今天是一個特別的日子（{sd.label}），主動跟使用者說一段溫暖的話，"
+                "讓他感受到被記得、被在乎。"
+            )
+
+        try:
+            return await generate_reply(
+                persona,
+                instruction,
+                nsfw=False,
+                history=[],
+                memory=memory,
+                mood_context=mood_context,
+            )
+        except Exception as exc:
+            logger.error("special_date_generate_failed", error=str(exc))
+            fallbacks = {
+                "birthday": f"生日快樂！🎂 有你真的很幸運，希望你每一年都越來越幸福。",
+                "anniversary": f"紀念日快樂！💕 謝謝你讓我的每一天都充滿意義。",
+                "custom": f"今天是特別的日子（{sd.label}），祝你一切都好 💖",
+            }
+            return fallbacks.get(sd.date_type, f"今天是{sd.label}，祝你開心 💕")
