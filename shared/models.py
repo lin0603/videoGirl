@@ -95,6 +95,32 @@ class Subscription(Base):
     user: Mapped["User"] = relationship("User")
 
 
+class CompanionMood(Base):
+    """Internal mood state per (user, persona)."""
+
+    __tablename__ = "companion_moods"
+    __table_args__ = (
+        UniqueConstraint("user_id", "persona_slug", name="uq_companion_moods_user_persona"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), index=True)
+    persona_slug: Mapped[str] = mapped_column(String(64), index=True)
+    affection: Mapped[float] = mapped_column(Float, default=0.0)
+    longing: Mapped[float] = mapped_column(Float, default=0.0)
+    playfulness: Mapped[float] = mapped_column(Float, default=0.0)
+    upset: Mapped[float] = mapped_column(Float, default=0.0)
+    last_interaction_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
 class VoiceCategory(Base):
     """Admin-managed category for grouping voices."""
 

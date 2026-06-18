@@ -34,13 +34,17 @@ async def generate_reply(
     nsfw: bool = False,
     history: list[Message] | None = None,
     memory: str = "",
+    mood_context: str = "",
 ) -> str:
     """Build the prompt and get an in-character reply. Degrades on LLM failure."""
     messages: list[Message] = [
         {
             "role": "system",
             "content": build_system_prompt(
-                persona, memory_context=memory, nsfw_enabled=nsfw
+                persona,
+                memory_context=memory,
+                mood_context=mood_context,
+                nsfw_enabled=nsfw,
             ),
         }
     ]
@@ -56,13 +60,23 @@ async def generate_reply(
 
 
 async def respond(
-    uid: int, user_text: str, persona: Persona, *, nsfw: bool = False
+    uid: int,
+    user_text: str,
+    persona: Persona,
+    *,
+    nsfw: bool = False,
+    mood_context: str = "",
 ) -> str:
     """Full memory-aware turn: recall -> reply -> persist -> background-extract."""
     history = await get_recent_history(uid)
     memory = await build_memory_context(uid, user_text)
     reply = await generate_reply(
-        persona, user_text, nsfw=nsfw, history=history, memory=memory
+        persona,
+        user_text,
+        nsfw=nsfw,
+        history=history,
+        memory=memory,
+        mood_context=mood_context,
     )
     await save_turn(uid, "user", user_text)
     await save_turn(uid, "assistant", reply)

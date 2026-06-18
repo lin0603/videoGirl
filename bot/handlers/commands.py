@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.handlers.onboarding import start_onboarding
 from bot.states import OnboardingState
 from shared.logging import get_logger
+from shared.mood import MoodService
 from shared.repositories.user_repo import UserRepository
 from shared.repositories.voice_repo import VoiceRepository
 
@@ -32,6 +33,7 @@ def get_router() -> Router:
             "/voice_off - 關閉語音回覆\n"
             "/voice_settings - 查看語音設定\n"
             "/voice_list - 列出可選的語音類別\n"
+            "/mood - 查看女友此刻心情\n"
             "/voice_set <類別> - 選擇語音類別\n"
             "/products - 查看 Stars 數位商品\n"
             "/buy <商品代碼> - 開立 Telegram Stars 發票\n"
@@ -146,5 +148,27 @@ def get_router() -> Router:
             return
         await repo.set_voice_slug(message.from_user.id, slug)
         await message.answer(f"已把語音類別換成「{voice.name}」🎙️")
+
+    @router.message(Command("mood"))
+    async def cmd_mood(message: types.Message, session: AsyncSession) -> None:
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        snapshot = await MoodService(session).get_mood(
+            message.from_user.id, "xiaorou"
+        )
+        label_map = {
+            "affection": "滿心喜歡你 💕",
+            "playfulness": "想鬧你 😝",
+            "longing": "好想你 🥺",
+            "upset": "有點小委屈 😤",
+            "neutral": "平靜地陪著你 😌",
+        }
+        await message.answer(
+            f"此刻心情：{label_map.get(snapshot.dominant, snapshot.dominant)}\n"
+            f"（{snapshot.phrase}）"
+        )
 
     return router

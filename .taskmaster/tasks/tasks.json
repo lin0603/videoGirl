@@ -284,7 +284,7 @@
         "id": "21",
         "title": "VIP 月訂閱",
         "description": "Recurring monthly VIP via Telegram Stars subscriptions with entitlements.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "19"
         ],
@@ -292,7 +292,7 @@
         "details": "Stars subscription via subscription_period=2592000 (30d). subscriptions table (user_id, status, current_period_end). Entitlements: unlimited chat / NSFW / higher media quota. Handle renewal, cancellation, and failed-renewal grace. Gate features by active subscription.",
         "testStrategy": "Create subscription -> entitlements active; simulate renew & cancel -> entitlements toggle correctly; expired sub revokes VIP features.",
         "subtasks": [],
-        "updatedAt": "2026-06-18T15:15:42.417Z"
+        "updatedAt": "2026-06-18T15:29:57.820Z"
       },
       {
         "id": "22",
@@ -442,7 +442,7 @@
         "id": "32",
         "title": "女友情緒 / 心情模型",
         "description": "Companion has an internal mood (happy/missing/jealous/down) that shifts with interaction and colors tone.",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           "4",
           "5",
@@ -451,7 +451,8 @@
         "priority": "high",
         "details": "companion_mood per (user, persona): dimensions like affection/longing/playfulness/upset. Updated by events: long no-reply -> longing/slightly upset; frequent warm chat -> happy/affectionate; gifts (#22) -> positive. Decays back toward baseline over time. Mood injected into the system prompt so replies AND proactive messages (#12) reflect current emotion.",
         "testStrategy": "After deliberate silence the next reply carries longing/mild sulk; warm interaction shifts tone affectionate; mood decays to baseline over time; proactive messages reflect current mood.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T15:49:51.528Z"
       },
       {
         "id": "33",
@@ -471,9 +472,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T15:15:42.417Z",
+      "lastModified": "2026-06-18T15:49:51.528Z",
       "taskCount": 33,
-      "completedCount": 10,
+      "completedCount": 11,
       "tags": [
         "master"
       ]

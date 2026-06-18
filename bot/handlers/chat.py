@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from orchestrator.core import respond
 from orchestrator.persona import get_persona
 from shared.logging import get_logger
+from shared.mood import MoodService, format_mood_for_prompt
 from shared.repositories.subscription_repo import EntitlementService
 from shared.repositories.user_repo import UserRepository
 from shared.repositories.voice_repo import VoiceRepository
@@ -41,12 +42,19 @@ def get_router() -> Router:
                 "輸入 /subscribe 訂閱 VIP 月方案 💎"
             )
 
+        # Update companion mood and inject it into the system prompt.
+        mood_phrase = await MoodService(session).process_chat_message(
+            message.from_user.id, persona.slug, message.text
+        )
+        mood_context = format_mood_for_prompt(mood_phrase)
+
         try:
             reply_text = await respond(
                 message.from_user.id,
                 message.text,
                 persona,
                 nsfw=nsfw,
+                mood_context=mood_context,
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("respond_failed", telegram_id=message.from_user.id, error=str(exc))
