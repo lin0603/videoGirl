@@ -3,42 +3,78 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>videoGirl Stars</title>
+    <title>videoGirl</title>
     <link rel="stylesheet" href="/miniapp-static/styles.css" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body>
-    <main class="shell">
-      <section class="topbar">
-        <div>
-          <p class="eyebrow">Telegram Stars</p>
-          <h1>videoGirl</h1>
+    <div id="app">
+      <!-- Tab nav -->
+      <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="home">💕 主頁</button>
+        <button class="tab-btn" data-tab="personas">👤 人設</button>
+        <button class="tab-btn" data-tab="wallet">💳 錢包</button>
+        <button class="tab-btn" data-tab="store">🛍️ 商店</button>
+      </nav>
+
+      <!-- Home tab -->
+      <section class="tab-pane active" id="tab-home">
+        <div class="hero">
+          <div class="avatar" id="home-avatar">💕</div>
+          <h2 id="home-persona-name">正在載入...</h2>
+          <p class="subtitle" id="home-level-label">關係：陌生人</p>
         </div>
-        <span id="status" class="status">連線中</span>
-      </section>
-
-      <section class="balance">
-        <div>
-          <span class="label">數位商品</span>
-          <strong id="product-title">寫真解鎖包</strong>
+        <div class="stat-card">
+          <div class="stat">
+            <span class="stat-label">親密分數</span>
+            <strong id="home-score">—</strong>
+          </div>
+          <div class="stat">
+            <span class="stat-label">連續天數</span>
+            <strong id="home-streak">—</strong>
+          </div>
+          <div class="stat">
+            <span class="stat-label">VIP</span>
+            <strong id="home-vip">—</strong>
+          </div>
         </div>
-        <div class="stars"><span id="product-price">25</span> Stars</div>
+        <div class="stat-card">
+          <div class="stat">
+            <span class="stat-label">點數餘額</span>
+            <strong id="home-balance">—</strong>
+          </div>
+        </div>
+        <p id="home-msg" class="hint">載入中…</p>
       </section>
 
-      <section class="products" aria-label="數位商品">
-        <button class="product active" data-product="photo_pack" data-title="寫真解鎖包" data-price="25">
-          <span>寫真解鎖包</span>
-          <b>25</b>
-        </button>
-        <button class="product" data-product="vip_day" data-title="VIP 一日體驗" data-price="99">
-          <span>VIP 一日體驗</span>
-          <b>99</b>
-        </button>
+      <!-- Personas tab -->
+      <section class="tab-pane" id="tab-personas">
+        <h2 class="screen-title">選擇女友人設</h2>
+        <div id="personas-list" class="card-list"></div>
+        <p id="personas-msg" class="hint">載入中…</p>
       </section>
 
-      <button id="pay" class="pay" type="button">用 Stars 付款</button>
-      <p id="message" class="message">公開頁面維持 SFW；付款僅購買數位內容與虛擬權益。</p>
-    </main>
+      <!-- Wallet tab -->
+      <section class="tab-pane" id="tab-wallet">
+        <h2 class="screen-title">點數錢包</h2>
+        <div class="stat-card big-card">
+          <span class="stat-label">目前餘額</span>
+          <strong class="big-number" id="wallet-balance">—</strong>
+          <span class="stat-label">點</span>
+        </div>
+        <h3 class="section-label">儲值點數</h3>
+        <div id="topup-products" class="card-list"></div>
+        <p id="wallet-msg" class="hint"></p>
+      </section>
+
+      <!-- Store tab -->
+      <section class="tab-pane" id="tab-store">
+        <h2 class="screen-title">Stars 商店</h2>
+        <div id="store-products" class="card-list"></div>
+        <p id="store-msg" class="hint">所有購買均為數位內容與虛擬服務。</p>
+      </section>
+    </div>
+
     <script src="/miniapp-static/app.js"></script>
   </body>
 </html>

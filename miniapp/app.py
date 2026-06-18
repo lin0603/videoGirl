@@ -22,8 +22,11 @@ from miniapp.security import (
 )
 from shared.config import get_settings
 from shared.db import AsyncSessionLocal
+from shared.intimacy import IntimacyService
 from shared.payments import StarsPaymentService, UnknownProductError
+from shared.repositories.subscription_repo import EntitlementService
 from shared.repositories.user_repo import UserRepository
+from shared.wallet import WalletService
 
 ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
@@ -159,6 +162,90 @@ async def create_stars_invoice_link(
         amount_stars=tx.amount_stars,
         product=tx.product,
     )
+
+
+class UserStatusResponse(BaseModel):
+    user_id: int
+    display_name: str | None
+    is_vip: bool
+    balance: int
+    intimacy_level: int
+    intimacy_level_name: str
+    intimacy_score: float
+    streak_days: int
+    active_persona_slug: str
+
+
+class PersonaResponse(BaseModel):
+    slug: str
+    name: str
+    personality: str
+
+
+@router.get("/api/user/status")
+async def get_user_status(
+    user_id: int = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_db),
+) -> UserStatusResponse:
+    repo = UserRepository(session)
+    user = await repo.get_by_telegram_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user not found")
+
+    entitlements = EntitlementService(session)
+    is_vip = await entitlements.nsfw_allowed(user)
+    balance = await WalletService(session).get_balance(user_id)
+    status = await IntimacyService(session).get_status(user_id)
+    from orchestrator.persona import DEFAULT_PERSONA
+    persona_slug = getattr(user, "active_persona_slug", DEFAULT_PERSONA)
+
+    return UserStatusResponse(
+        user_id=user_id,
+        display_name=user.display_name,
+        is_vip=is_vip,
+        balance=balance,
+        intimacy_level=status.level,
+        intimacy_level_name=status.level_name,
+        intimacy_score=status.score,
+        streak_days=status.streak,
+        active_persona_slug=persona_slug,
+    )
+
+
+@router.get("/api/personas")
+async def list_personas(
+    user_id: int = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_db),
+) -> list[PersonaResponse]:
+    from orchestrator.persona import PERSONAS
+    repo = UserRepository(session)
+    await repo.get_by_telegram_id(user_id)  # auth gate
+    return [
+        PersonaResponse(slug=p.slug, name=p.name, personality=p.personality)
+        for p in PERSONAS.values()
+    ]
+
+
+class SwitchPersonaRequest(BaseModel):
+    slug: str
+
+
+@router.post("/api/personas/switch")
+async def switch_persona(
+    body: SwitchPersonaRequest,
+    user_id: int = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_db),
+) -> dict:
+    from orchestrator.persona import PERSONAS
+    if body.slug not in PERSONAS:
+        raise HTTPException(status_code=404, detail="unknown persona slug")
+    repo = UserRepository(session)
+    user = await repo.get_by_telegram_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    user.active_persona_slug = body.slug
+    await session.flush()
+    return {"ok": True, "slug": body.slug}
 
 
 def register_mini_app(app: FastAPI) -> None:
