@@ -26,6 +26,9 @@ class User(Base):
     # Proactive engine (task #12)
     proactive_opt_out: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Active persona (task #26) — slug references the in-code PERSONAS registry.
+    active_persona_slug: Mapped[str] = mapped_column(String(64), default="xiaorou")
+
     # Voice settings (task #9 integration). TTS is BreezyVoice-only.
     voice_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     voice_provider: Mapped[str] = mapped_column(String(32), default="breezevoice")

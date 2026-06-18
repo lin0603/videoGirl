@@ -41,7 +41,7 @@ def get_router() -> Router:
             await message.answer(refusal_message())
             return
 
-        persona = get_persona()
+        persona = get_persona(getattr(user, "active_persona_slug", None))
         entitlements = EntitlementService(session)
         nsfw_allowed = await entitlements.nsfw_allowed(user)
         nsfw = user.nsfw_opt_in and user.age_verified_at is not None and nsfw_allowed

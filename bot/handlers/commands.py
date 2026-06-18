@@ -58,6 +58,8 @@ def get_router() -> Router:
             "/reminders - 列出進行中的提醒\n"
             "/cancel_reminder <編號> - 取消提醒\n"
             "/voice_set <類別> - 選擇語音類別\n"
+            "/personas - 查看可選的女友人設\n"
+            "/switch <代碼> - 切換女友人設\n"
             "/products - 查看 Stars 數位商品\n"
             "/buy <商品代碼> - 開立 Telegram Stars 發票\n"
             "/subscribe - 訂閱 VIP 月方案\n"
@@ -181,8 +183,10 @@ def get_router() -> Router:
         if user is None:
             await message.answer("請先完成註冊：/start")
             return
+        from orchestrator.persona import DEFAULT_PERSONA
+        persona_slug = getattr(user, "active_persona_slug", DEFAULT_PERSONA)
         snapshot = await MoodService(session).get_mood(
-            message.from_user.id, "xiaorou"
+            message.from_user.id, persona_slug
         )
         label_map = {
             "affection": "滿心喜歡你 💕",
@@ -336,6 +340,50 @@ def get_router() -> Router:
         )
         await message.answer(
             f"✅ 記住了！{label}（{month:02d}/{day:02d}），到時候我一定會好好紀念的 💕"
+        )
+
+    @router.message(Command("personas"))
+    async def cmd_personas(message: types.Message, session: AsyncSession) -> None:
+        """List available personas and show the current active one."""
+        from orchestrator.persona import PERSONAS, DEFAULT_PERSONA
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        current_slug = getattr(user, "active_persona_slug", DEFAULT_PERSONA) if user else DEFAULT_PERSONA
+        lines = []
+        for slug, p in PERSONAS.items():
+            marker = "✅" if slug == current_slug else "・"
+            lines.append(f"{marker} <code>{slug}</code> — {p.name}（{p.personality[:20]}…）")
+        await message.answer(
+            "可選的女友人設：\n"
+            + "\n".join(lines)
+            + "\n\n用 /switch <代碼> 切換。目前是 "
+            + (PERSONAS[current_slug].name if current_slug in PERSONAS else current_slug)
+            + " 喔 💕"
+        )
+
+    @router.message(Command("switch"))
+    async def cmd_switch(message: types.Message, session: AsyncSession) -> None:
+        """Switch the active persona."""
+        from orchestrator.persona import PERSONAS
+        parts = (message.text or "").split(maxsplit=1)
+        if len(parts) < 2:
+            await message.answer("用法：/switch <人設代碼>（用 /personas 查看代碼）")
+            return
+        slug = parts[1].strip().lower()
+        if slug not in PERSONAS:
+            await message.answer(f"找不到人設「{slug}」，用 /personas 看看有哪些。")
+            return
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        user.active_persona_slug = slug
+        await session.flush()
+        p = PERSONAS[slug]
+        await message.answer(
+            f"好，現在換成 {p.name} 陪你了！\n"
+            f"她的個性：{p.personality} 💕"
         )
 
     @router.message(Command("refer"))
