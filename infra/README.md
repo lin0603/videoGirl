@@ -35,7 +35,7 @@
 | `redis_url` | Redis 連線字串 | `redis://redis:6379/0` |
 | `ollama_base_url` | Mac mini 上的 Ollama LAN IP | `http://192.168.1.100:11434` |
 | `comfyui_base_url` | 4090 上的 ComfyUI（透過 Tailscale） | `http://ai.bygpu.com:8188` |
-| `breezyvoice_base_url` | 4090 上的 BreezyVoice TTS | `http://ai.bygpu.com:8080` |
+| `breezyvoice_base_url` | 4090 上的 BreezyVoice TTS | `https://breezyvoice.momooai.com` |
 | `embedding_model` | CPU 使用的 embedding 模型 | `BAAI/bge-m3` |
 | `model_name` | 預設 LLM 名稱 | `HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive` |
 | `log_level` | 日誌等級 | `INFO` |

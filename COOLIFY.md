@@ -35,7 +35,7 @@ Critical variables:
 | `redis_url` | `redis://redis:6379/0` | Use Coolify-managed Redis hostname if you create one |
 | `ollama_base_url` | `http://192.168.1.100:11434` | Must be reachable from the Coolify server |
 | `comfyui_base_url` | `http://ai.bygpu.com:8188` | Optional image/video pipeline |
-| `breezyvoice_base_url` | `http://ai.bygpu.com:8080` | Optional GPU TTS |
+| `breezyvoice_base_url` | `https://breezyvoice.momooai.com` | Optional GPU TTS |
 | `model_name` | `hf.co/...:Q6_K` | Ollama model tag |
 | `llm_profile` | `mac-qwen9b` | Choose a profile from `shared/llm.py` |
 

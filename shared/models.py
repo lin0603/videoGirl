@@ -25,7 +25,7 @@ class User(Base):
     # Voice settings (task #9 integration). TTS is BreezyVoice-only.
     voice_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     voice_provider: Mapped[str] = mapped_column(String(32), default="breezevoice")
-    voice_slug: Mapped[str] = mapped_column(String(64), default="default")
+    voice_slug: Mapped[str] = mapped_column(String(64), default="yiting")
     voice_speed: Mapped[float] = mapped_column(Float, default=1.0)
     voice_reference_audio_url: Mapped[str | None] = mapped_column(String(1024))
     voice_reference_audio_path: Mapped[str | None] = mapped_column(String(1024))
