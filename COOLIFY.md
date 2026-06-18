@@ -128,6 +128,7 @@ docker run --rm --env-file .env --network host videogirl:test
 | `Connection refused` to Ollama/ComfyUI | The Coolify server cannot reach your GPU box. Use a public or VPN-routable address. |
 | `telegram_token` missing | The env variable was not saved in Coolify before deploy. |
 | Container exits immediately | Check logs; likely database not ready or token invalid. |
+| Health check is green but Telegram does not answer | Check application logs for `bot_task_failed`. The app exits if the polling worker dies so Coolify can restart it. Common causes are a duplicate running deployment using the same bot token (`terminated by other getUpdates request`), an invalid token, or a migration/schema error. |
 | `.venv` rebuild warning inside container | Make sure `.dockerignore` excludes `.venv/`; it does in this repo. |
 
 ## Files involved

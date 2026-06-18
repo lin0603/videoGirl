@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -16,15 +17,28 @@ from shared.logging import get_logger
 logger = get_logger("admin.main")
 
 
+def _exit_if_bot_dies(task: asyncio.Task) -> None:
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is None:
+        logger.error("bot_task_stopped_unexpectedly")
+    else:
+        logger.exception("bot_task_failed", error=str(exc))
+    os._exit(1)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
     shutdown_event = asyncio.Event()
     logger.info("admin_starting", host=settings.admin_host, port=settings.admin_port)
     bot_task = asyncio.create_task(start_bot(shutdown_event))
+    bot_task.add_done_callback(_exit_if_bot_dies)
     yield
     logger.info("admin_shutting_down")
     shutdown_event.set()
+    bot_task.remove_done_callback(_exit_if_bot_dies)
     await bot_task
 
 
