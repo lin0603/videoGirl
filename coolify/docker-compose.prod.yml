@@ -6,7 +6,7 @@ services:
     pull_policy: always
     container_name: videogirl-bot
     ports:
-      - "8000:8000"
+      - "3000:3000"
     environment:
       # Override local dev defaults to use the compose service hostnames.
       # All other env vars (telegram_token, ollama_base_url, etc.) are injected

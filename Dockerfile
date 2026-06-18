@@ -19,7 +19,7 @@ RUN uv sync --no-dev --python python3.11
 COPY . /app
 
 # Expose the admin web UI port.
-EXPOSE 8000
+EXPOSE 3000
 
 # Default healthcheck used by Coolify; can be overridden.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
