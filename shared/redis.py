@@ -9,7 +9,8 @@ class RedisClient:
         self.client: redis.Redis | None = None
 
     async def connect(self) -> redis.Redis:
-        self.client = redis.from_url(self.url, decode_responses=True)
+        if self.client is None:
+            self.client = redis.from_url(self.url, decode_responses=True)
         return self.client
 
     async def disconnect(self) -> None:

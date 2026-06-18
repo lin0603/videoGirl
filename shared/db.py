@@ -1,6 +1,14 @@
 import asyncpg
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from shared.config import settings
+
+
+def _asyncpg_to_asyncpg_url(dsn: str) -> str:
+    """Convert a postgresql:// DSN to postgresql+asyncpg:// for SQLAlchemy."""
+    if dsn.startswith("postgresql://") and not dsn.startswith("postgresql+asyncpg://"):
+        return dsn.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return dsn
 
 
 class Database:
@@ -41,3 +49,12 @@ async def get_pool() -> asyncpg.Pool:
         await db.connect()
     assert db.pool is not None
     return db.pool
+
+
+_engine = create_async_engine(_asyncpg_to_asyncpg_url(settings.postgres_url), future=True)
+AsyncSessionLocal = async_sessionmaker(_engine, expire_on_commit=False)
+
+
+async def get_session():
+    async with AsyncSessionLocal() as session:
+        yield session

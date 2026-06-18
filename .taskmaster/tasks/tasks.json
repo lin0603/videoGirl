@@ -45,14 +45,15 @@
         "id": "4",
         "title": "Persona system + dynamic prompt builder",
         "description": "Configurable girlfriend personas (personality, speaking style, backstory, boundaries, nsfw_level) with a Jinja2-based system-prompt builder.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "3"
         ],
         "priority": "high",
         "details": "personas table: slug, name, personality, speaking_style, backstory, boundaries[], nsfw_level (0/1/2), default_voice_seed, system_prompt_template (Jinja2), active. build_system_prompt(persona, memory_context, nsfw_enabled, current_time TW tz). NSFW-on vs SFW branches in template. Support multiple selectable personas + per-user current persona.",
         "testStrategy": "Unit tests render prompt with/without memory and NSFW flag; switching persona changes response style; opencc check confirms Traditional Chinese output.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T04:07:47.105Z"
       },
       {
         "id": "5",
@@ -461,9 +462,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T04:05:02.746Z",
+      "lastModified": "2026-06-18T04:07:47.105Z",
       "taskCount": 33,
-      "completedCount": 2,
+      "completedCount": 3,
       "tags": [
         "master"
       ]
