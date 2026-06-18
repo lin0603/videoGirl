@@ -1,0 +1,609 @@
+"""FastAPI admin backend for voices, categories and personas."""
+
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from admin.auth import SESSION_COOKIE, check_credentials, sign_session, verify_session
+from repositories import admin_repo as repo
+from shared.config import get_settings
+from shared.db import AsyncSessionLocal
+from shared.models import Persona, Voice, VoiceCategory
+
+app = FastAPI(title="videoGirl Admin")
+templates = Jinja2Templates(directory="admin/templates")
+
+
+def _admin_redirect(path: str) -> RedirectResponse:
+    resp = RedirectResponse(path, status_code=status.HTTP_303_SEE_OTHER)
+    return resp
+
+
+async def require_admin(request: Request) -> str:
+    username = verify_session(request)
+    if username is None:
+        raise HTTPException(
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+            headers={"Location": "/admin/login"},
+            detail="Not authenticated",
+        )
+    return username
+
+
+async def get_db() -> AsyncSession:
+    async with AsyncSessionLocal() as session:
+        yield session
+
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse(request, "login.html", {})
+
+
+@app.post("/admin/login")
+async def login_submit(
+    request: Request,
+    username: Annotated[str, Form()],
+    password: Annotated[str, Form()],
+):
+    if not check_credentials(username, password):
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"error": "帳號或密碼錯誤"},
+        )
+    resp = _admin_redirect("/admin/")
+    resp.set_cookie(SESSION_COOKIE, sign_session(username), httponly=True, samesite="lax")
+    return resp
+
+
+@app.get("/admin/logout")
+async def logout():
+    resp = _admin_redirect("/admin/login")
+    resp.delete_cookie(SESSION_COOKIE)
+    return resp
+
+
+@app.get("/admin/", response_class=HTMLResponse)
+async def dashboard(request: Request, username: str = Depends(require_admin)):
+    return templates.TemplateResponse(request, "dashboard.html", {})
+
+
+# Helpers
+
+
+def _bool_value(form: dict, key: str) -> bool:
+    return form.get(key) in ("1", "on", "true")
+
+
+def _float_or(form: dict, key: str, default: float) -> float:
+    try:
+        return float(form[key])
+    except (KeyError, ValueError):
+        return default
+
+
+def _int_or(form: dict, key: str, default: int) -> int:
+    try:
+        return int(form[key])
+    except (KeyError, ValueError):
+        return default
+
+
+def _category_rows(categories: list[VoiceCategory]) -> list[dict]:
+    return [
+        {
+            "slug": c.slug,
+            "name": c.name,
+            "sort_order": c.sort_order,
+            "active": c.active,
+        }
+        for c in categories
+    ]
+
+
+def _voice_rows(voices: list[Voice]) -> list[dict]:
+    return [
+        {
+            "slug": v.slug,
+            "name": v.name,
+            "provider": v.provider,
+            "category": v.category.name if v.category else "",
+            "sort_order": v.sort_order,
+            "active": v.active,
+        }
+        for v in voices
+    ]
+
+
+def _persona_rows(personas: list[Persona]) -> list[dict]:
+    return [
+        {
+            "slug": p.slug,
+            "name": p.name,
+            "nsfw_level": p.nsfw_level,
+            "sort_order": p.sort_order,
+            "active": p.active,
+        }
+        for p in personas
+    ]
+
+
+# Voice categories
+
+
+@app.get("/admin/categories", response_class=HTMLResponse)
+async def list_categories(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    categories = await repo.list_categories(session)
+    return templates.TemplateResponse(
+        request,
+        "list.html",
+        {
+            "title": "語音分類",
+            "entity": "categories",
+            "columns": [
+                {"key": "slug", "label": "代碼"},
+                {"key": "name", "label": "名稱"},
+                {"key": "sort_order", "label": "排序"},
+                {"key": "active", "label": "啟用", "type": "bool"},
+            ],
+            "rows": _category_rows(categories),
+        },
+    )
+
+
+@app.get("/admin/categories/new", response_class=HTMLResponse)
+async def new_category(
+    request: Request,
+    username: str = Depends(require_admin),
+):
+    return templates.TemplateResponse(
+        request,
+        "form.html",
+        {
+            "title": "新增語音分類",
+            "entity": "categories",
+            "fields": [
+                {"name": "slug", "label": "代碼", "value": "", "type": "text"},
+                {"name": "name", "label": "名稱", "value": "", "type": "text"},
+                {"name": "sort_order", "label": "排序", "value": 0, "type": "int"},
+                {"name": "active", "label": "啟用", "value": True, "type": "checkbox"},
+            ],
+        },
+    )
+
+
+@app.post("/admin/categories/new")
+async def create_category(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    form = await request.form()
+    await repo.create_category(
+        session,
+        {
+            "slug": form["slug"],
+            "name": form["name"],
+            "sort_order": _int_or(form, "sort_order", 0),
+            "active": _bool_value(form, "active"),
+        },
+    )
+    return _admin_redirect("/admin/categories")
+
+
+@app.get("/admin/categories/{slug}/edit", response_class=HTMLResponse)
+async def edit_category(
+    request: Request,
+    slug: str,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    cat = await repo.get_category(session, slug)
+    if cat is None:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        request,
+        "form.html",
+        {
+            "title": f"編輯語音分類: {cat.name}",
+            "entity": "categories",
+            "fields": [
+                {"name": "name", "label": "名稱", "value": cat.name, "type": "text"},
+                {"name": "sort_order", "label": "排序", "value": cat.sort_order, "type": "int"},
+                {"name": "active", "label": "啟用", "value": cat.active, "type": "checkbox"},
+            ],
+        },
+    )
+
+
+@app.post("/admin/categories/{slug}/edit")
+async def update_category(
+    request: Request,
+    slug: str,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    cat = await repo.get_category(session, slug)
+    if cat is None:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    await repo.update_category(
+        session,
+        cat,
+        {
+            "name": form["name"],
+            "sort_order": _int_or(form, "sort_order", 0),
+            "active": _bool_value(form, "active"),
+        },
+    )
+    return _admin_redirect("/admin/categories")
+
+
+@app.post("/admin/categories/{slug}/delete")
+async def delete_category(
+    slug: str,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    cat = await repo.get_category(session, slug)
+    if cat is None:
+        raise HTTPException(status_code=404)
+    await repo.delete_category(session, cat)
+    return _admin_redirect("/admin/categories")
+
+
+# Voices
+
+
+@app.get("/admin/voices", response_class=HTMLResponse)
+async def list_voices(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    voices = await repo.list_voices(session)
+    return templates.TemplateResponse(
+        request,
+        "list.html",
+        {
+            "title": "語音",
+            "entity": "voices",
+            "columns": [
+                {"key": "slug", "label": "代碼"},
+                {"key": "name", "label": "名稱"},
+                {"key": "provider", "label": "提供者"},
+                {"key": "category", "label": "分類"},
+                {"key": "sort_order", "label": "排序"},
+                {"key": "active", "label": "啟用", "type": "bool"},
+            ],
+            "rows": _voice_rows(voices),
+        },
+    )
+
+
+async def _voice_form_context(
+    request: Request,
+    session: AsyncSession,
+    voice: Voice | None,
+    title: str,
+) -> dict:
+    categories = await repo.list_categories(session)
+    cat_options = [{"value": "", "label": "（無）"}] + [
+        {"value": c.slug, "label": c.name} for c in categories
+    ]
+    provider_options = [
+        {"value": "breezevoice", "label": "BreezyVoice"},
+        {"value": "edge-tts", "label": "Edge TTS"},
+        {"value": "existing", "label": "Existing audio"},
+    ]
+    v = voice or Voice(
+        slug="",
+        name="",
+        provider="breezevoice",
+        reference_audio_path="",
+        reference_transcript="",
+        tempo=1.0,
+        active=True,
+        sort_order=0,
+        category_slug=None,
+    )
+    return {
+        "request": request,
+        "title": title,
+        "entity": "voices",
+        "fields": [
+            *(
+                [{"name": "slug", "label": "代碼", "value": v.slug, "type": "text"}]
+                if voice is None
+                else []
+            ),
+            {"name": "name", "label": "名稱", "value": v.name, "type": "text"},
+            {
+                "name": "provider",
+                "label": "提供者",
+                "value": v.provider,
+                "type": "select",
+                "options": provider_options,
+            },
+            {
+                "name": "category_slug",
+                "label": "分類",
+                "value": v.category_slug or "",
+                "type": "select",
+                "options": cat_options,
+            },
+            {"name": "reference_audio_path", "label": "參考音檔路徑", "value": v.reference_audio_path or "", "type": "text"},
+            {
+                "name": "reference_transcript",
+                "label": "參考音檔台詞",
+                "value": v.reference_transcript or "",
+                "type": "textarea",
+            },
+            {"name": "tempo", "label": "語速", "value": v.tempo, "type": "number"},
+            {"name": "sort_order", "label": "排序", "value": v.sort_order, "type": "int"},
+            {"name": "active", "label": "啟用", "value": v.active, "type": "checkbox"},
+        ],
+    }
+
+
+@app.get("/admin/voices/new", response_class=HTMLResponse)
+async def new_voice(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    ctx = await _voice_form_context(request, session, None, "新增語音")
+    return templates.TemplateResponse(request, "form.html", ctx)
+
+
+@app.post("/admin/voices/new")
+async def create_voice(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    form = await request.form()
+    category_slug = form.get("category_slug") or None
+    await repo.create_voice(
+        session,
+        {
+            "slug": form["slug"],
+            "name": form["name"],
+            "provider": form.get("provider", "breezevoice"),
+            "category_slug": category_slug,
+            "reference_audio_path": form.get("reference_audio_path") or None,
+            "reference_transcript": form.get("reference_transcript") or None,
+            "tempo": _float_or(form, "tempo", 1.0),
+            "sort_order": _int_or(form, "sort_order", 0),
+            "active": _bool_value(form, "active"),
+        },
+    )
+    return _admin_redirect("/admin/voices")
+
+
+@app.get("/admin/voices/{slug}/edit", response_class=HTMLResponse)
+async def edit_voice(
+    request: Request,
+    slug: str,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    voice = await repo.get_voice(session, slug)
+    if voice is None:
+        raise HTTPException(status_code=404)
+    ctx = await _voice_form_context(request, session, voice, f"編輯語音: {voice.name}")
+    return templates.TemplateResponse(request, "form.html", ctx)
+
+
+@app.post("/admin/voices/{slug}/edit")
+async def update_voice(
+    request: Request,
+    slug: str,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    voice = await repo.get_voice(session, slug)
+    if voice is None:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    category_slug = form.get("category_slug") or None
+    await repo.update_voice(
+        session,
+        voice,
+        {
+            "name": form["name"],
+            "provider": form.get("provider", "breezevoice"),
+            "category_slug": category_slug,
+            "reference_audio_path": form.get("reference_audio_path") or None,
+            "reference_transcript": form.get("reference_transcript") or None,
+            "tempo": _float_or(form, "tempo", 1.0),
+            "sort_order": _int_or(form, "sort_order", 0),
+            "active": _bool_value(form, "active"),
+        },
+    )
+    return _admin_redirect("/admin/voices")
+
+
+@app.post("/admin/voices/{slug}/delete")
+async def delete_voice(
+    slug: str,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    voice = await repo.get_voice(session, slug)
+    if voice is None:
+        raise HTTPException(status_code=404)
+    await repo.delete_voice(session, voice)
+    return _admin_redirect("/admin/voices")
+
+
+# Personas
+
+
+@app.get("/admin/personas", response_class=HTMLResponse)
+async def list_personas(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    personas = await repo.list_personas(session)
+    return templates.TemplateResponse(
+        request,
+        "list.html",
+        {
+            "title": "人設",
+            "entity": "personas",
+            "columns": [
+                {"key": "slug", "label": "代碼"},
+                {"key": "name", "label": "名稱"},
+                {"key": "nsfw_level", "label": "NSFW 等級"},
+                {"key": "sort_order", "label": "排序"},
+                {"key": "active", "label": "啟用", "type": "bool"},
+            ],
+            "rows": _persona_rows(personas),
+        },
+    )
+
+
+def _persona_fields(persona: Persona | None) -> list[dict]:
+    p = persona or Persona(
+        slug="",
+        name="",
+        avatar_url="",
+        system_prompt="",
+        greeting="",
+        nsfw_level=0,
+        active=True,
+        sort_order=0,
+    )
+    fields = []
+    if persona is None:
+        fields.append({"name": "slug", "label": "代碼", "value": p.slug, "type": "text"})
+    fields.extend(
+        [
+            {"name": "name", "label": "名稱", "value": p.name, "type": "text"},
+            {"name": "avatar_url", "label": "頭像 URL", "value": p.avatar_url or "", "type": "text"},
+            {
+                "name": "system_prompt",
+                "label": "系統提示詞 (System Prompt)",
+                "value": p.system_prompt,
+                "type": "textarea",
+            },
+            {"name": "greeting", "label": "開場問候", "value": p.greeting, "type": "textarea"},
+            {"name": "nsfw_level", "label": "NSFW 等級", "value": p.nsfw_level, "type": "int"},
+            {"name": "sort_order", "label": "排序", "value": p.sort_order, "type": "int"},
+            {"name": "active", "label": "啟用", "value": p.active, "type": "checkbox"},
+        ]
+    )
+    return fields
+
+
+@app.get("/admin/personas/new", response_class=HTMLResponse)
+async def new_persona(
+    request: Request,
+    username: str = Depends(require_admin),
+):
+    return templates.TemplateResponse(
+        request,
+        "form.html",
+        {
+            "title": "新增人設",
+            "entity": "personas",
+            "fields": _persona_fields(None),
+        },
+    )
+
+
+@app.post("/admin/personas/new")
+async def create_persona(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    form = await request.form()
+    await repo.create_persona(
+        session,
+        {
+            "slug": form["slug"],
+            "name": form["name"],
+            "avatar_url": form.get("avatar_url") or None,
+            "system_prompt": form.get("system_prompt", ""),
+            "greeting": form.get("greeting", ""),
+            "nsfw_level": _int_or(form, "nsfw_level", 0),
+            "sort_order": _int_or(form, "sort_order", 0),
+            "active": _bool_value(form, "active"),
+        },
+    )
+    return _admin_redirect("/admin/personas")
+
+
+@app.get("/admin/personas/{slug}/edit", response_class=HTMLResponse)
+async def edit_persona(
+    request: Request,
+    slug: str,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    persona = await repo.get_persona(session, slug)
+    if persona is None:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        request,
+        "form.html",
+        {
+            "title": f"編輯人設: {persona.name}",
+            "entity": "personas",
+            "fields": _persona_fields(persona),
+        },
+    )
+
+
+@app.post("/admin/personas/{slug}/edit")
+async def update_persona(
+    request: Request,
+    slug: str,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    persona = await repo.get_persona(session, slug)
+    if persona is None:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    await repo.update_persona(
+        session,
+        persona,
+        {
+            "name": form["name"],
+            "avatar_url": form.get("avatar_url") or None,
+            "system_prompt": form.get("system_prompt", ""),
+            "greeting": form.get("greeting", ""),
+            "nsfw_level": _int_or(form, "nsfw_level", 0),
+            "sort_order": _int_or(form, "sort_order", 0),
+            "active": _bool_value(form, "active"),
+        },
+    )
+    return _admin_redirect("/admin/personas")
+
+
+@app.post("/admin/personas/{slug}/delete")
+async def delete_persona(
+    slug: str,
+    session: AsyncSession = Depends(get_db),
+    username: str = Depends(require_admin),
+):
+    persona = await repo.get_persona(session, slug)
+    if persona is None:
+        raise HTTPException(status_code=404)
+    await repo.delete_persona(session, persona)
+    return _admin_redirect("/admin/personas")

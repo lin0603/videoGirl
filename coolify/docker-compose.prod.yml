@@ -1,11 +1,12 @@
 # Production Docker Compose for self-hosting or Coolify.
-# This stack includes the Telegram bot worker, PostgreSQL with pgvector, and Redis.
-# No HTTP port is exposed because the bot communicates via Telegram's long-polling.
+# This stack includes the Telegram bot worker, admin web UI, PostgreSQL with pgvector, and Redis.
 services:
   app:
     image: ghcr.io/lin0603/videogirl:main
     pull_policy: always
     container_name: videogirl-bot
+    ports:
+      - "8000:8000"
     environment:
       # Override local dev defaults to use the compose service hostnames.
       # All other env vars (telegram_token, ollama_base_url, etc.) are injected
@@ -16,7 +17,6 @@ services:
       - postgres
       - redis
     restart: unless-stopped
-    # Coolify web-based healthchecks expect an HTTP path; this worker has none.
     # The Dockerfile's HEALTHCHECK command handles container-level checks.
 
   postgres:

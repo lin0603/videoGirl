@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Admin{% endblock %} | videoGirl</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+  <nav class="bg-gray-800 border-b border-gray-700">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/admin/" class="text-xl font-bold text-pink-400">videoGirl Admin</a>
+      <div class="flex items-center gap-4">
+        <a href="/admin/categories" class="hover:text-pink-300">語音分類</a>
+        <a href="/admin/voices" class="hover:text-pink-300">語音</a>
+        <a href="/admin/personas" class="hover:text-pink-300">人設</a>
+        <a href="/admin/logout" class="text-sm text-gray-400 hover:text-white">登出</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    {% if message %}
+      <div class="mb-4 p-3 rounded bg-green-900/40 border border-green-700 text-green-200">
+        {{ message }}
+      </div>
+    {% endif %}
+    {% if error %}
+      <div class="mb-4 p-3 rounded bg-red-900/40 border border-red-700 text-red-200">
+        {{ error }}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

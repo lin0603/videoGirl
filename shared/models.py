@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -30,8 +31,29 @@ class User(Base):
     voice_reference_audio_path: Mapped[str | None] = mapped_column(String(1024))
 
 
+class VoiceCategory(Base):
+    """Admin-managed category for grouping voices."""
+
+    __tablename__ = "voice_categories"
+
+    slug: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    sort_order: Mapped[int] = mapped_column(BigInteger, default=0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    voices: Mapped[list["Voice"]] = relationship(
+        "Voice", back_populates="category", cascade="all, delete-orphan"
+    )
+
+
 class Voice(Base):
-    """Backend-configurable voice category catalog (admin-managed, task #7/#9)."""
+    """Backend-configurable voice catalog (admin-managed, task #7/#9)."""
 
     __tablename__ = "voices"
 
@@ -43,3 +65,38 @@ class Voice(Base):
     reference_transcript: Mapped[str | None] = mapped_column(String(2048))
     tempo: Mapped[float] = mapped_column(Float, default=1.0)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(BigInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    category_slug: Mapped[str | None] = mapped_column(
+        ForeignKey("voice_categories.slug"), nullable=True
+    )
+    category: Mapped[Optional["VoiceCategory"]] = relationship(
+        "VoiceCategory", back_populates="voices"
+    )
+
+
+class Persona(Base):
+    """Admin-managed character persona."""
+
+    __tablename__ = "personas"
+
+    slug: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    avatar_url: Mapped[str | None] = mapped_column(String(1024))
+    system_prompt: Mapped[str] = mapped_column(Text, default="")
+    greeting: Mapped[str] = mapped_column(Text, default="")
+    nsfw_level: Mapped[int] = mapped_column(BigInteger, default=0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(BigInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )

@@ -1,3 +1,5 @@
+import asyncio
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -38,13 +40,22 @@ def create_bot() -> Bot:
     )
 
 
-async def start_bot() -> None:
+async def start_bot(shutdown_event: asyncio.Event | None = None) -> None:
     bot = create_bot()
     dp = create_dispatcher()
     logger.info("bot_starting")
     await db.connect()
     try:
-        await dp.start_polling(bot)
+        if shutdown_event is None:
+            await dp.start_polling(bot)
+        else:
+            polling_task = asyncio.create_task(dp.start_polling(bot))
+            await shutdown_event.wait()
+            polling_task.cancel()
+            try:
+                await polling_task
+            except asyncio.CancelledError:
+                pass
     finally:
         await db.disconnect()
         await bot.session.close()

@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     openai_compat_model: str = ""
     vllm_base_url: str = ""
 
+    # --- Admin web UI (task #7) ---
+    admin_username: str = "admin"
+    admin_password: str = "admin"
+    admin_secret_key: str = "change-me-in-production"
+    admin_host: str = "0.0.0.0"
+    admin_port: int = 8000
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

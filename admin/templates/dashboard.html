@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">管理後台</h1>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+  <a href="/admin/categories" class="block p-6 bg-gray-800 rounded-lg border border-gray-700 hover:border-pink-500">
+    <h2 class="text-xl font-semibold text-pink-400">語音分類</h2>
+    <p class="text-gray-400 mt-2">管理語音類別</p>
+  </a>
+  <a href="/admin/voices" class="block p-6 bg-gray-800 rounded-lg border border-gray-700 hover:border-pink-500">
+    <h2 class="text-xl font-semibold text-pink-400">語音</h2>
+    <p class="text-gray-400 mt-2">管理語音設定與參考音檔</p>
+  </a>
+  <a href="/admin/personas" class="block p-6 bg-gray-800 rounded-lg border border-gray-700 hover:border-pink-500">
+    <h2 class="text-xl font-semibold text-pink-400">人設</h2>
+    <p class="text-gray-400 mt-2">管理角色人設與系統提示詞</p>
+  </a>
+</div>
+{% endblock %}

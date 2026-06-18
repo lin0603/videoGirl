@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">{{ title }}</h1>
+  <a href="/admin/{{ entity }}/new" class="px-4 py-2 bg-pink-600 hover:bg-pink-500 rounded">新增</a>
+</div>
+
+<div class="overflow-x-auto bg-gray-800 rounded-lg border border-gray-700">
+  <table class="w-full text-left">
+    <thead class="bg-gray-700 text-gray-200">
+      <tr>
+        {% for col in columns %}
+        <th class="px-4 py-3">{{ col.label }}</th>
+        {% endfor %}
+        <th class="px-4 py-3">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr class="border-t border-gray-700">
+        {% for col in columns %}
+        <td class="px-4 py-3">
+          {% set value = row[col.key] %}
+          {% if col.type == 'bool' %}
+            {% if value %}✅{% else %}❌{% endif %}
+          {% elif col.type == 'text' %}
+            <div class="max-w-xs truncate">{{ value or '' }}</div>
+          {% else %}
+            {{ value or '' }}
+          {% endif %}
+        </td>
+        {% endfor %}
+        <td class="px-4 py-3 space-x-2">
+          <a href="/admin/{{ entity }}/{{ row.slug }}/edit" class="text-pink-400 hover:underline">編輯</a>
+          <form method="post" action="/admin/{{ entity }}/{{ row.slug }}/delete" class="inline" onsubmit="return confirm('確定刪除？')">
+            <button type="submit" class="text-red-400 hover:underline">刪除</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="{{ columns|length + 1 }}" class="px-4 py-6 text-center text-gray-500">尚無資料</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -18,9 +18,12 @@ RUN uv sync --no-dev --python python3.11
 # Copy application code.
 COPY . /app
 
+# Expose the admin web UI port.
+EXPOSE 8000
+
 # Default healthcheck used by Coolify; can be overridden.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD uv run --python python3.11 python -m shared.health || exit 1
 
-# Start migrations then the bot.
+# Start migrations then the admin UI + bot worker.
 CMD ["bash", "scripts/start.sh"]

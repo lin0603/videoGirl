@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">{{ title }}</h1>
+<form method="post" class="max-w-2xl bg-gray-800 p-6 rounded-lg border border-gray-700 space-y-4">
+  {% for field in fields %}
+  <div>
+    <label class="block text-sm text-gray-400 mb-1">{{ field.label }}</label>
+    {% if field.type == 'textarea' %}
+      <textarea name="{{ field.name }}" rows="6"
+                class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded focus:outline-none focus:border-pink-500">{{ field.value or '' }}</textarea>
+    {% elif field.type == 'select' %}
+      <select name="{{ field.name }}" class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded focus:outline-none focus:border-pink-500">
+        {% for opt in field.options %}
+        <option value="{{ opt.value }}" {% if opt.value == field.value %}selected{% endif %}>{{ opt.label }}</option>
+        {% endfor %}
+      </select>
+    {% elif field.type == 'checkbox' %}
+      <label class="inline-flex items-center gap-2">
+        <input type="checkbox" name="{{ field.name }}" value="1" {% if field.value %}checked{% endif %}
+               class="w-4 h-4 rounded border-gray-700 bg-gray-900 text-pink-600">
+        <span class="text-sm text-gray-300">啟用</span>
+      </label>
+    {% elif field.type == 'number' %}
+      <input type="number" step="any" name="{{ field.name }}" value="{{ field.value }}"
+             class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded focus:outline-none focus:border-pink-500">
+    {% elif field.type == 'int' %}
+      <input type="number" name="{{ field.name }}" value="{{ field.value }}"
+             class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded focus:outline-none focus:border-pink-500">
+    {% else %}
+      <input type="text" name="{{ field.name }}" value="{{ field.value or '' }}"
+             class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded focus:outline-none focus:border-pink-500">
+    {% endif %}
+  </div>
+  {% endfor %}
+  <div class="pt-2">
+    <button type="submit" class="px-6 py-2 bg-pink-600 hover:bg-pink-500 rounded font-semibold">儲存</button>
+    <a href="/admin/{{ entity }}" class="ml-3 text-gray-400 hover:text-white">取消</a>
+  </div>
+</form>
+{% endblock %}
