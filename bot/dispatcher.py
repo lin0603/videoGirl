@@ -1,4 +1,5 @@
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
@@ -30,7 +31,10 @@ def create_dispatcher() -> Dispatcher:
 
 
 def create_bot() -> Bot:
-    return Bot(token=settings.telegram_token, parse_mode=ParseMode.HTML)
+    return Bot(
+        token=settings.telegram_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
 
 
 async def start_bot() -> None:

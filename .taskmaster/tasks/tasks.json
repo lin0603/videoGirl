@@ -74,7 +74,7 @@
         "id": "6",
         "title": "Orchestrator v1: persona + memory + history -> LLM -> reply",
         "description": "Core dialog loop wiring persona, retrieved memory, and history into the LLM call and back to Telegram, with per-user rate limiting and graceful fallbacks.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "2",
           "4",
@@ -84,7 +84,7 @@
         "details": "On inbound message: load user+persona, retrieve memory, build prompt, call LLM, persist turns, send reply. Handle NSFW gating (block if not opted in). Error handling: timeouts, LLM unavailable -> friendly fallback text. Concurrency-safe per user. This is the end-to-end MVP slice (text chat + memory + persona).",
         "testStrategy": "End-to-end: a real Telegram message yields a persona-consistent zh-TW reply using recalled memory; NSFW blocked for non-opted users; LLM failure degrades to a graceful message, not a crash.",
         "subtasks": [],
-        "updatedAt": "2026-06-18T04:36:10.252Z"
+        "updatedAt": "2026-06-18T04:41:13.605Z"
       },
       {
         "id": "7",
@@ -464,9 +464,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T04:36:10.252Z",
+      "lastModified": "2026-06-18T04:41:13.605Z",
       "taskCount": 33,
-      "completedCount": 5,
+      "completedCount": 6,
       "tags": [
         "master"
       ]
