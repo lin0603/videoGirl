@@ -263,6 +263,13 @@ class Persona(Base):
     nsfw_level: Mapped[int] = mapped_column(BigInteger, default=0)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(BigInteger, default=0)
+    # Character consistency: LoRA filename (relative to ComfyUI models/loras/) + strength.
+    # Empty string = no LoRA (use base model + trigger words only).
+    lora_name: Mapped[str] = mapped_column(String(256), default="")
+    lora_strength: Mapped[float] = mapped_column(Float, default=0.8)
+    # ComfyUI workflow path override (relative to infra/comfyui/workflows/).
+    # Empty = use system default workflow; set to enable LoRA or IPAdapter pipelines.
+    image_workflow: Mapped[str] = mapped_column(String(256), default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
