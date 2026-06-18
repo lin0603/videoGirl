@@ -20,6 +20,16 @@ def _is_admin(telegram_id: int) -> bool:
     ids = {x.strip() for x in (settings.admin_telegram_ids or "").split(",") if x.strip()}
     return str(telegram_id) in ids
 
+from shared.gifts import (
+    GIFT_CATALOG,
+    create_gift_invoice,
+    is_gift_payload,
+    is_unlock_payload,
+    parse_gift_key,
+    parse_unlock_key,
+    record_gift,
+    record_unlock,
+)
 from shared.payments import (
     PRODUCTS,
     STARS_CURRENCY,
@@ -46,6 +56,40 @@ def get_router() -> Router:
             + "\n".join(lines)
             + "\n\n用 /buy <商品代碼> 開立 Telegram Stars 發票。\n"
             "或輸入 /subscribe 訂閱 VIP 月方案。"
+        )
+
+    @router.message(Command("gift"))
+    async def cmd_gift(message: types.Message, bot: Bot) -> None:
+        """Send a virtual gift to the girlfriend via Stars payment."""
+        parts = (message.text or "").split(maxsplit=1)
+        gift_key = parts[1].strip().lower() if len(parts) > 1 else ""
+
+        if not gift_key:
+            lines = [
+                f"・<code>{item.key}</code> {item.emoji} {item.title}（{item.stars} Stars）"
+                for item in GIFT_CATALOG.values()
+            ]
+            await message.answer(
+                "可以送女友的禮物：\n"
+                + "\n".join(lines)
+                + "\n\n用 /gift <禮物代碼> 送出禮物，她會很感動喔 💕"
+            )
+            return
+
+        if gift_key not in GIFT_CATALOG:
+            await message.answer("沒有這個禮物。請用 /gift 查看禮物清單。")
+            return
+
+        link = await create_gift_invoice(bot, message.from_user.id, gift_key)
+        item = GIFT_CATALOG[gift_key]
+        await message.answer(
+            f"送出 {item.emoji} {item.title} 給她吧！",
+            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[[
+                types.InlineKeyboardButton(
+                    text=f"付款 {item.stars} Stars",
+                    url=link,
+                )
+            ]]),
         )
 
     @router.message(Command("buy"))
@@ -156,6 +200,38 @@ def get_router() -> Router:
         session: AsyncSession,
     ) -> None:
         payment = message.successful_payment
+        if is_gift_payload(payment.invoice_payload):
+            gift_record, is_new = await record_gift(session, message.from_user.id, payment)
+            if is_new:
+                from shared.gifts import GIFT_CATALOG
+                from shared.mood import MoodService
+                from orchestrator.persona import get_persona
+                item = GIFT_CATALOG.get(gift_record.gift_key)
+                emoji = item.emoji if item else "🎁"
+                # Boost companion mood using the gift event.
+                persona = get_persona()
+                mood_svc = MoodService(session)
+                await mood_svc.process_event(
+                    message.from_user.id,
+                    persona.slug,
+                    "gift",
+                )
+                await message.answer(
+                    f"謝謝你送的 {emoji}！她看到一定很開心 💕"
+                )
+            else:
+                await message.answer("這份禮物已記錄過，不會重複計算。")
+            return
+
+        if is_unlock_payload(payment.invoice_payload):
+            item_key = parse_unlock_key(payment.invoice_payload) or "unknown"
+            _unlock, is_new = await record_unlock(session, message.from_user.id, item_key, payment)
+            if is_new:
+                await message.answer(f"解鎖成功！「{item_key}」已永久解鎖 🔓")
+            else:
+                await message.answer("這個解鎖已記錄過，不會重複發放。")
+            return
+
         if is_vip_payload(payment.invoice_payload):
             try:
                 _, is_new = await handle_successful_payment(

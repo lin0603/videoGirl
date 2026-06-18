@@ -278,6 +278,43 @@ class Persona(Base):
     )
 
 
+class Unlock(Base):
+    """Per-user record of a paid media unlock (task #22)."""
+
+    __tablename__ = "unlocks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE")
+    )
+    item_key: Mapped[str] = mapped_column(String(256))  # e.g. "photo_pack", "nsfw_video_001"
+    stars_paid: Mapped[int] = mapped_column(Integer)
+    charge_id: Mapped[str] = mapped_column(String(256), unique=True)
+    unlocked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+
+
+class GiftRecord(Base):
+    """Virtual gift sent by user to the companion (task #22)."""
+
+    __tablename__ = "gift_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sender_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE")
+    )
+    gift_key: Mapped[str] = mapped_column(String(128))  # e.g. "flower", "diamond", "cake"
+    stars_paid: Mapped[int] = mapped_column(Integer)
+    mood_boost: Mapped[float] = mapped_column(Float)
+    charge_id: Mapped[str] = mapped_column(String(256), unique=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+    sender: Mapped["User"] = relationship("User", foreign_keys=[sender_id])
+
+
 class SpecialDate(Base):
     """Birthday / anniversary / custom dates that trigger proactive gift messages (task #33)."""
 
