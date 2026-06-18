@@ -58,6 +58,7 @@ def get_router() -> Router:
             "/reminders - 列出進行中的提醒\n"
             "/cancel_reminder <編號> - 取消提醒\n"
             "/voice_set <類別> - 選擇語音類別\n"
+            "/intimacy - 查看我們的親密度與等級\n"
             "/personas - 查看可選的女友人設\n"
             "/switch <代碼> - 切換女友人設\n"
             "/products - 查看 Stars 數位商品\n"
@@ -340,6 +341,26 @@ def get_router() -> Router:
         )
         await message.answer(
             f"✅ 記住了！{label}（{month:02d}/{day:02d}），到時候我一定會好好紀念的 💕"
+        )
+
+    @router.message(Command("intimacy"))
+    async def cmd_intimacy(message: types.Message, session: AsyncSession) -> None:
+        """Show current intimacy level and progress."""
+        from shared.intimacy import IntimacyService, LEVEL_THRESHOLDS, MAX_LEVEL
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        status = await IntimacyService(session).get_status(message.from_user.id)
+        progress = ""
+        if status.next_threshold is not None:
+            remaining = max(0, status.next_threshold - int(status.score))
+            progress = f"，還差約 {remaining} 點升級"
+        await message.answer(
+            f"💕 我們現在的關係：{status.level_name}（等級 {status.level}）\n"
+            f"親密分數：{status.score:.0f}{progress}\n"
+            f"連續互動：{status.streak} 天 🔥"
         )
 
     @router.message(Command("personas"))

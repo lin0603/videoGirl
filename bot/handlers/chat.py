@@ -73,6 +73,13 @@ def get_router() -> Router:
 
         await message.answer(reply_text)
 
+        # Update intimacy score for each chat interaction (fire-and-forget).
+        try:
+            from shared.intimacy import IntimacyService
+            await IntimacyService(session).record_interaction(message.from_user.id)
+        except Exception:
+            pass  # non-critical
+
         # Detect photo-request intent; enqueue async image generation.
         if is_photo_request(message.text):
             photo_quota = await check_quota(message.from_user.id, "image")

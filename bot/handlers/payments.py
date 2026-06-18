@@ -208,7 +208,8 @@ def get_router() -> Router:
                 from orchestrator.persona import get_persona
                 item = GIFT_CATALOG.get(gift_record.gift_key)
                 emoji = item.emoji if item else "🎁"
-                # Boost companion mood using the gift event.
+                # Boost companion mood and intimacy.
+                from shared.intimacy import IntimacyService
                 persona = get_persona()
                 mood_svc = MoodService(session)
                 await mood_svc.process_event(
@@ -216,6 +217,7 @@ def get_router() -> Router:
                     persona.slug,
                     "gift",
                 )
+                await IntimacyService(session).record_gift(message.from_user.id)
                 await message.answer(
                     f"謝謝你送的 {emoji}！她看到一定很開心 💕"
                 )

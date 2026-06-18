@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -279,6 +279,23 @@ class Persona(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+
+class UserRelationship(Base):
+    """Intimacy score, streak, and level for gamified closeness (task #24)."""
+
+    __tablename__ = "user_relationships"
+
+    telegram_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), primary_key=True
+    )
+    intimacy_level: Mapped[int] = mapped_column(Integer, default=0)
+    affection_score: Mapped[float] = mapped_column(Float, default=0.0)
+    streak_days: Mapped[int] = mapped_column(Integer, default=0)
+    last_interaction: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    special_dates: Mapped[list] = mapped_column(JSON, default=list)
+
+    user: Mapped["User"] = relationship("User", foreign_keys=[telegram_id])
 
 
 class Unlock(Base):
