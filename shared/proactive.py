@@ -18,8 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from shared.db import AsyncSessionLocal
 from shared.logging import get_logger
 from shared.memory import build_memory_context
-from shared.models import CompanionMood, User
+from shared.models import CompanionMood, Reminder, User
 from shared.mood import MoodService, format_mood_for_prompt
+from shared.reminders import ReminderService
 from shared.repositories.mood_repo import MoodRepository
 from shared.repositories.user_repo import UserRepository
 from orchestrator.persona import build_system_prompt, get_persona
@@ -113,6 +114,14 @@ class ProactiveEngine:
                 id="proactive_tick",
                 replace_existing=True,
             )
+            # Life reminders need minute-level resolution.
+            self.scheduler.add_job(
+                self._reminder_tick,
+                "interval",
+                minutes=1,
+                id="reminder_tick",
+                replace_existing=True,
+            )
             self.scheduler.start()
             logger.info("proactive_engine_started")
 
@@ -178,6 +187,84 @@ class ProactiveEngine:
             local_hour=local_dt.hour,
         )
         return True
+
+    async def _reminder_tick(self) -> None:
+        async with self.session_factory() as session:
+            service = ReminderService(session)
+            due = await service.get_due_reminders()
+            logger.debug("reminder_tick_due", count=len(due))
+            for reminder in due:
+                try:
+                    await self._send_reminder(session, reminder)
+                except Exception as exc:
+                    logger.error(
+                        "reminder_send_error",
+                        reminder_id=reminder.id,
+                        error=str(exc),
+                    )
+
+    async def _send_reminder(
+        self, session: AsyncSession, reminder: Reminder
+    ) -> None:
+        user = await UserRepository(session).get_by_telegram_id(reminder.user_id)
+        if user is None or user.proactive_opt_out:
+            return
+
+        text = await self._generate_reminder_message(session, user, reminder)
+        try:
+            await self.bot.send_message(user.telegram_id, text)
+        except Exception as exc:
+            logger.error(
+                "reminder_send_failed",
+                reminder_id=reminder.id,
+                user_id=user.telegram_id,
+                error=str(exc),
+            )
+            return
+
+        await ReminderService(session).mark_delivered_and_reschedule(reminder)
+        logger.info(
+            "reminder_sent",
+            reminder_id=reminder.id,
+            user_id=user.telegram_id,
+            content=reminder.content,
+        )
+
+    async def _generate_reminder_message(
+        self, session: AsyncSession, user: User, reminder: Reminder
+    ) -> str:
+        persona = get_persona("xiaorou")
+        memory = await build_memory_context(user.telegram_id, "")
+        mood_service = MoodService(session)
+        mood = await mood_service.get_mood(user.telegram_id, persona.slug)
+        mood_context = format_mood_for_prompt(mood.phrase)
+
+        system_prompt = build_system_prompt(
+            persona,
+            memory_context=memory,
+            mood_context=mood_context,
+            nsfw_enabled=False,
+        )
+        instruction = (
+            f"以女朋友的口吻提醒使用者：{reminder.content}。\n"
+            "語氣要溫暖、自然，像貼心女友在關心他，不要像冰冷的鬧鐘。"
+        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": instruction},
+        ]
+        try:
+            return await generate_reply(
+                persona,
+                instruction,
+                nsfw=False,
+                history=messages[:-1],
+                memory=memory,
+                mood_context=mood_context,
+            )
+        except Exception as exc:
+            logger.error("reminder_generate_failed", error=str(exc))
+            return f"寶貝，記得 {reminder.content} 喔 💕"
 
     async def _generate_message(
         self, session: AsyncSession, user: User, prompt: ProactivePrompt

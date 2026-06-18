@@ -1,3 +1,5 @@
+from zoneinfo import ZoneInfo
+
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -7,6 +9,7 @@ from bot.handlers.onboarding import start_onboarding
 from bot.states import OnboardingState
 from shared.logging import get_logger
 from shared.mood import MoodService
+from shared.reminders import ReminderParseError, ReminderService
 from shared.repositories.user_repo import UserRepository
 from shared.repositories.voice_repo import VoiceRepository
 
@@ -35,6 +38,9 @@ def get_router() -> Router:
             "/voice_list - 列出可選的語音類別\n"
             "/mood - 查看女友此刻心情\n"
             "/snooze - 暫停主動關心訊息\n"
+            "/remind <自然語言> - 新增生活提醒\n"
+            "/reminders - 列出進行中的提醒\n"
+            "/cancel_reminder <編號> - 取消提醒\n"
             "/voice_set <類別> - 選擇語音類別\n"
             "/products - 查看 Stars 數位商品\n"
             "/buy <商品代碼> - 開立 Telegram Stars 發票\n"
@@ -186,5 +192,65 @@ def get_router() -> Router:
             await message.answer("已重新開啟主動關心訊息 💌")
         else:
             await message.answer("已暫停主動關心訊息。想重新開啟再輸入一次 /snooze。")
+
+    @router.message(Command("remind"))
+    async def cmd_remind(message: types.Message, session: AsyncSession) -> None:
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        text = (message.text or "").replace("/remind", "", 1).strip()
+        if not text:
+            await message.answer("用法：/remind 明天下午三點繳電費")
+            return
+        try:
+            parsed = await ReminderService(session).parse_and_create(
+                user.telegram_id, text, timezone_str=user.timezone
+            )
+        except ReminderParseError as exc:
+            await message.answer(str(exc))
+            return
+        local_due = parsed.due_at.astimezone(ZoneInfo(user.timezone))
+        await message.answer(
+            f"好～我記住了：「{parsed.content}」\n"
+            f"提醒時間：{local_due.strftime('%Y-%m-%d %H:%M')}（{user.timezone}）\n"
+            f"週期：{parsed.recurrence}"
+        )
+
+    @router.message(Command("reminders"))
+    async def cmd_reminders(message: types.Message, session: AsyncSession) -> None:
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        reminders = await ReminderService(session).list_active(user.telegram_id)
+        if not reminders:
+            await message.answer("目前沒有進行中的提醒喔。")
+            return
+        lines = []
+        for r in reminders:
+            local = r.due_at.astimezone(ZoneInfo(user.timezone))
+            lines.append(f"#{r.id} {r.content} — {local.strftime('%m/%d %H:%M')} ({r.recurrence})")
+        await message.answer("📋 進行中的提醒：\n" + "\n".join(lines))
+
+    @router.message(Command("cancel_reminder"))
+    async def cmd_cancel_reminder(message: types.Message, session: AsyncSession) -> None:
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        parts = (message.text or "").split(maxsplit=1)
+        if len(parts) < 2 or not parts[1].strip().lstrip("#").isdigit():
+            await message.answer("用法：/cancel_reminder <編號>")
+            return
+        reminder_id = int(parts[1].strip().lstrip("#"))
+        cancelled = await ReminderService(session).cancel(reminder_id, user.telegram_id)
+        if cancelled is None:
+            await message.answer("找不到這個提醒，或已經取消了。")
+            return
+        await message.answer(f"已取消提醒：{cancelled.content}")
 
     return router

@@ -158,6 +158,27 @@ class CreditLedger(Base):
     )
 
 
+class Reminder(Base):
+    """Natural-language life reminders (task #13)."""
+
+    __tablename__ = "reminders"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), index=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    reminder_type: Mapped[str] = mapped_column(String(32), default="custom")  # bill/tax/chore/custom
+    recurrence: Mapped[str] = mapped_column(String(32), default="once")  # once/daily/weekly/monthly/yearly
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    timezone: Mapped[str] = mapped_column(String(64), default="Asia/Taipei")
+    status: Mapped[str] = mapped_column(String(32), default="active")  # active/done/cancelled
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
 class VoiceCategory(Base):
     """Admin-managed category for grouping voices."""
 
