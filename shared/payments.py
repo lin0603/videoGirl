@@ -37,7 +37,23 @@ PRODUCTS: dict[str, StarsProduct] = {
         description="解鎖 24 小時 VIP 數位服務體驗。",
         amount_stars=99,
     ),
+    "credits_100": StarsProduct(
+        slug="credits_100",
+        title="100 點數儲值",
+        description="儲值 100 點到錢包，可用於圖片、語音、影片生成。",
+        amount_stars=50,
+    ),
 }
+
+
+def credits_amount_from_slug(slug: str) -> int | None:
+    """Parse credit amount from product slug like credits_100 -> 100."""
+    if not slug.startswith("credits_"):
+        return None
+    try:
+        return int(slug.split("_", 1)[1])
+    except (IndexError, ValueError):
+        return None
 
 
 class UnknownProductError(ValueError):

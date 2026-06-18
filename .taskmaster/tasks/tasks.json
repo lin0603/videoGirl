@@ -269,7 +269,7 @@
         "id": "20",
         "title": "點數錢包 (credits)",
         "description": "Stars-funded credit wallet; media generation (photo/voice/video) debits credits atomically.",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           "19",
           "8",
@@ -278,7 +278,8 @@
         "priority": "high",
         "details": "wallets(user_id, balance) + ledger(entry_id, user_id, delta, reason, ref) with atomic transactions. Top-up: buy credits with Stars (#19). Debit on each media job (photo/voice/video) tied to GPU cost; block + friendly prompt when insufficient. Expose balance in chat and Mini App.",
         "testStrategy": "Top-up adds credits; generating an image debits the right amount atomically; concurrent debits never go negative; insufficient balance is blocked with a prompt.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T16:02:49.552Z"
       },
       {
         "id": "21",
@@ -442,7 +443,7 @@
         "id": "32",
         "title": "女友情緒 / 心情模型",
         "description": "Companion has an internal mood (happy/missing/jealous/down) that shifts with interaction and colors tone.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "4",
           "5",
@@ -452,7 +453,7 @@
         "details": "companion_mood per (user, persona): dimensions like affection/longing/playfulness/upset. Updated by events: long no-reply -> longing/slightly upset; frequent warm chat -> happy/affectionate; gifts (#22) -> positive. Decays back toward baseline over time. Mood injected into the system prompt so replies AND proactive messages (#12) reflect current emotion.",
         "testStrategy": "After deliberate silence the next reply carries longing/mild sulk; warm interaction shifts tone affectionate; mood decays to baseline over time; proactive messages reflect current mood.",
         "subtasks": [],
-        "updatedAt": "2026-06-18T15:49:51.528Z"
+        "updatedAt": "2026-06-18T16:00:33.706Z"
       },
       {
         "id": "33",
@@ -472,9 +473,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T15:49:51.528Z",
+      "lastModified": "2026-06-18T16:02:49.555Z",
       "taskCount": 33,
-      "completedCount": 11,
+      "completedCount": 12,
       "tags": [
         "master"
       ]

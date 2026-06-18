@@ -13,6 +13,7 @@ from shared.subscriptions import (
     is_vip_payload,
     validate_pre_checkout,
 )
+from shared.wallet import WalletService
 
 
 def _is_admin(telegram_id: int) -> bool:
@@ -197,9 +198,24 @@ def get_router() -> Router:
             return
 
         if delivered:
-            await message.answer(
-                f"付款成功，已解鎖「{tx.product}」。謝謝你的 {tx.amount_stars} Stars！"
-            )
+            from shared.payments import credits_amount_from_slug
+
+            credits = credits_amount_from_slug(tx.product)
+            if credits:
+                await WalletService(session).top_up(
+                    message.from_user.id,
+                    credits,
+                    reason="stars_topup",
+                    reference=tx.telegram_payment_charge_id,
+                )
+                await message.answer(
+                    f"付款成功！已儲值 {credits} 點到你的錢包。\n"
+                    f"目前餘額：{await WalletService(session).get_balance(message.from_user.id)} 點。"
+                )
+            else:
+                await message.answer(
+                    f"付款成功，已解鎖「{tx.product}」。謝謝你的 {tx.amount_stars} Stars！"
+                )
         else:
             await message.answer("這筆付款已處理過，權益不會重複發放。")
 
@@ -231,6 +247,39 @@ def get_router() -> Router:
         await message.answer(
             "付款支援：本服務只收 Telegram Stars（XTR）購買數位內容。\n"
             "若付款成功但權益未解鎖，請提供 Telegram 付款收據或 charge id。"
+        )
+
+    @router.message(Command("wallet"))
+    async def cmd_wallet(message: types.Message, session: AsyncSession) -> None:
+        balance = await WalletService(session).get_balance(message.from_user.id)
+        await message.answer(
+            f"💰 你的點數錢包餘額：<b>{balance}</b> 點\n"
+            "圖片、語音、影片生成會從這裡扣點。\n"
+            "輸入 /topup 儲值。",
+            parse_mode="HTML",
+        )
+
+    @router.message(Command("topup"))
+    async def cmd_topup(message: types.Message, session: AsyncSession) -> None:
+        parts = (message.text or "").split(maxsplit=1)
+        slug = parts[1].strip() if len(parts) > 1 else "credits_100"
+        service = StarsPaymentService(session)
+        try:
+            tx, product = await service.create_invoice_payload(
+                user_id=message.from_user.id,
+                product_slug=slug,
+            )
+        except UnknownProductError:
+            await message.answer("找不到這個儲值方案。目前可用：/buy credits_100")
+            return
+
+        await message.answer_invoice(
+            title=product.title,
+            description=product.description,
+            payload=tx.payload,
+            currency=STARS_CURRENCY,
+            provider_token=STARS_PROVIDER_TOKEN,
+            prices=[types.LabeledPrice(label=product.title, amount=product.amount_stars)],
         )
 
     @router.message(Command("terms"))

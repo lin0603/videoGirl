@@ -121,6 +121,36 @@ class CompanionMood(Base):
     )
 
 
+class Wallet(Base):
+    """Stars-funded credit wallet (task #20)."""
+
+    __tablename__ = "wallets"
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.telegram_id"), primary_key=True
+    )
+    balance: Mapped[int] = mapped_column(BigInteger, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class CreditLedger(Base):
+    """Atomic ledger entries for wallet credit changes."""
+
+    __tablename__ = "credit_ledger"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), index=True)
+    delta: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    balance_after: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    reference: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+
+
 class VoiceCategory(Base):
     """Admin-managed category for grouping voices."""
 

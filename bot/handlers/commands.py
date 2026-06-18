@@ -40,6 +40,8 @@ def get_router() -> Router:
             "/subscribe - 訂閱 VIP 月方案\n"
             "/vip_status - 查看 VIP 狀態\n"
             "/cancel_vip - 取消 VIP 自動續訂\n"
+            "/wallet - 查看點數餘額\n"
+            "/topup - 用 Stars 儲值點數\n"
             "/paysupport - 付款支援\n"
             "/terms - 服務條款\n"
             "/reset - 清除對話狀態"
