@@ -292,4 +292,13 @@ def get_router() -> Router:
             "4. 若發生付款或發放問題，請使用 /paysupport 聯絡處理。"
         )
 
+    @router.message(Command("stars_balance"))
+    async def cmd_stars_balance(message: types.Message, bot: Bot) -> None:
+        if not _is_admin(message.from_user.id):
+            await message.answer("此指令僅供管理員使用。")
+            return
+        from shared.compliance import get_stars_status
+        status = await get_stars_status(bot)
+        await message.answer(status.message)
+
     return router
