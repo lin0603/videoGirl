@@ -8,7 +8,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from shared.config import settings
 from shared.logging import configure_logging, get_logger
 
-from bot.handlers import chat, commands, onboarding
+from bot.handlers import chat, commands, onboarding, payments
 from bot.middlewares.db_session import DbSessionMiddleware
 from bot.middlewares.rate_limit import RateLimitMiddleware
 from shared.db import db
@@ -28,6 +28,7 @@ def create_dispatcher() -> Dispatcher:
 
     dp.include_router(commands.get_router())
     dp.include_router(onboarding.get_router())
+    dp.include_router(payments.get_router())
     dp.include_router(chat.get_router())
 
     return dp

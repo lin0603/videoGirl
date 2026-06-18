@@ -253,7 +253,7 @@
         "id": "19",
         "title": "Telegram Stars 付款核心",
         "description": "Accept Telegram Stars for digital goods: invoice -> pre_checkout -> successful_payment, idempotent, refunds, mandatory /paysupport & /terms.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "2",
           "6"
@@ -261,7 +261,8 @@
         "priority": "high",
         "details": "Use createInvoiceLink/sendInvoice with currency XTR and empty provider_token. Handle pre_checkout_query (answerPreCheckoutQuery within 10s). On successful_payment: verify + store telegram_payment_charge_id; make delivery IDEMPOTENT (dedupe by charge_id). Implement refundStarPayment. Implement required /paysupport and /terms commands. transactions table (user_id, charge_id, amount_stars, product, status, created_at).",
         "testStrategy": "Test-mode Stars flow completes invoice->pre_checkout->successful_payment; re-delivery of same charge_id does not double-credit; refundStarPayment works; /paysupport & /terms respond.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T10:09:44.764Z"
       },
       {
         "id": "20",
@@ -367,14 +368,15 @@
         "id": "27",
         "title": "Mini App 基礎設施",
         "description": "Public HTTPS for the Mini App via Cloudflare Tunnel from the Coolify box; serve static frontend.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "1"
         ],
         "priority": "medium",
         "details": "Mini App needs a public HTTPS URL. Use Cloudflare Tunnel (no open ports, works behind home NAT) from the Coolify host to serve the Mini App. Set CSP/CORS. Bot itself stays on long polling; only the Mini App web is exposed.",
         "testStrategy": "Mini App URL loads over HTTPS through Cloudflare Tunnel; no inbound ports opened on the home box.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T10:09:25.364Z"
       },
       {
         "id": "28",
@@ -467,9 +469,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T08:10:30.941Z",
+      "lastModified": "2026-06-18T10:09:44.764Z",
       "taskCount": 33,
-      "completedCount": 7,
+      "completedCount": 9,
       "tags": [
         "master"
       ]

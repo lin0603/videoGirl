@@ -33,6 +33,10 @@ def get_router() -> Router:
             "/voice_settings - 查看語音設定\n"
             "/voice_list - 列出可選的語音類別\n"
             "/voice_set <類別> - 選擇語音類別\n"
+            "/products - 查看 Stars 數位商品\n"
+            "/buy <商品代碼> - 開立 Telegram Stars 發票\n"
+            "/paysupport - 付款支援\n"
+            "/terms - 服務條款\n"
             "/reset - 清除對話狀態"
         )
 

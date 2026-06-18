@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from admin.auth import SESSION_COOKIE, check_credentials, sign_session, verify_session
+from miniapp.app import register_mini_app
 from repositories import admin_repo as repo
 from shared.config import get_settings
 from shared.db import AsyncSessionLocal
@@ -18,6 +19,7 @@ from shared.models import Persona, Voice, VoiceCategory
 
 app = FastAPI(title="videoGirl Admin")
 templates = Jinja2Templates(directory="admin/templates")
+register_mini_app(app)
 
 
 def _admin_redirect(path: str) -> RedirectResponse:

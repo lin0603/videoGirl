@@ -1,0 +1,185 @@
+:root {
+  color-scheme: light dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f5f2ea;
+  color: #1f2328;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(240, 98, 73, 0.14), transparent 34%),
+    linear-gradient(215deg, rgba(41, 128, 185, 0.16), transparent 38%),
+    #f7f4ee;
+}
+
+.shell {
+  width: min(100%, 480px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 22px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.topbar,
+.balance,
+.product {
+  border: 1px solid rgba(31, 35, 40, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 18px 48px rgba(31, 35, 40, 0.08);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.eyebrow,
+.label,
+.message {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+h1 {
+  margin: 2px 0 0;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.status {
+  flex: 0 0 auto;
+  min-width: 72px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #1f2328;
+  color: #fff;
+  text-align: center;
+  font-size: 13px;
+}
+
+.status.ready {
+  background: #0f766e;
+}
+
+.status.error {
+  background: #b42318;
+}
+
+.balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 8px;
+}
+
+.balance strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 20px;
+}
+
+.stars {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #ffe08a;
+  color: #5c3900;
+  font-weight: 800;
+}
+
+.products {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.product {
+  min-height: 92px;
+  border-radius: 8px;
+  padding: 14px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.product span,
+.product b {
+  display: block;
+}
+
+.product b {
+  margin-top: 8px;
+  font-size: 24px;
+}
+
+.product.active {
+  border-color: #0f766e;
+  background: #e7f7f2;
+}
+
+.pay {
+  min-height: 54px;
+  border: 0;
+  border-radius: 8px;
+  background: #d9381e;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pay:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.message {
+  line-height: 1.55;
+}
+
+@media (max-width: 360px) {
+  .products {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    background: #16171a;
+    color: #f4f4f5;
+  }
+
+  body {
+    background:
+      linear-gradient(135deg, rgba(240, 98, 73, 0.2), transparent 34%),
+      linear-gradient(215deg, rgba(41, 128, 185, 0.18), transparent 38%),
+      #16171a;
+  }
+
+  .topbar,
+  .balance,
+  .product {
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(35, 38, 43, 0.86);
+  }
+
+  .product.active {
+    background: rgba(15, 118, 110, 0.28);
+  }
+}

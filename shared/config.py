@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     admin_host: str = "0.0.0.0"
     admin_port: int = 8000
 
+    # --- Telegram Mini App public surface (tasks #27-#30) ---
+    mini_app_allowed_origins: str = "*"
+    mini_app_init_data_max_age_seconds: int = 86400
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
