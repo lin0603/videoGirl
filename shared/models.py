@@ -66,6 +66,35 @@ class PaymentTransaction(Base):
     user: Mapped["User"] = relationship("User")
 
 
+class Subscription(Base):
+    """Telegram Stars recurring VIP subscription."""
+
+    __tablename__ = "subscriptions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "status", name="uq_subscriptions_user_id_status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.telegram_id"), index=True
+    )
+    provider: Mapped[str] = mapped_column(String(32), default="stars")
+    status: Mapped[str] = mapped_column(String(32), default="active")
+    current_period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    grace_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    telegram_payment_charge_id: Mapped[str | None] = mapped_column(String(256), index=True)
+    provider_payment_charge_id: Mapped[str | None] = mapped_column(String(256))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user: Mapped["User"] = relationship("User")
+
+
 class VoiceCategory(Base):
     """Admin-managed category for grouping voices."""
 

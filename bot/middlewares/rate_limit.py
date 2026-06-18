@@ -3,10 +3,12 @@ from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.config import settings
 from shared.logging import get_logger
 from shared.redis import RedisClient
+from shared.repositories.subscription_repo import EntitlementService
 
 logger = get_logger("bot.rate_limit")
 
@@ -50,6 +52,15 @@ class RateLimitMiddleware(BaseMiddleware):
             await pipe.zadd(key, {str(now): now})
             await pipe.expire(key, self.window_seconds)
             results = await pipe.execute()
+
+        # VIP users get unlimited chat and skip rate limiting.
+        session: AsyncSession | None = data.get("session")
+        if session is not None:
+            try:
+                if await EntitlementService(session).is_vip(user_id):
+                    return await handler(event, data)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("rate_limit_vip_check_failed", user_id=user_id, error=str(exc))
 
         current_count = results[1]
         if current_count >= self.max_requests:

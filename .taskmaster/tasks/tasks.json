@@ -90,7 +90,7 @@
         "id": "7",
         "title": "Admin 後台 (FastAPI web,LAN-only):語音類別 / 用戶 / 對話 / 指標",
         "description": "輕量 admin 後台,讓營運者管理『語音類別(voices 目錄)』、檢視/調整用戶設定、檢視最近對話、看基本指標。伺服器端渲染(FastAPI+Jinja2),只在區網內、HTTP Basic 驗證,不對公網開放。",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "6",
           "9"
@@ -98,7 +98,8 @@
         "priority": "medium",
         "details": "做一個獨立的 admin web 服務(FastAPI + Jinja2 伺服器端渲染,不需前端 build),重用 shared/ 的 models 與 repositories;新增到 Coolify 的 compose 當另一個服務,只綁區網埠(例:8090),HTTP Basic 驗證(ADMIN_USER/ADMIN_PASS 由 env),預設不對公網開放。\n功能:\n1) 語音類別 CRUD(voices 表,= 後台設語音類別):列表/新增/編輯/刪除/啟用停用;欄位 slug,name,provider(固定 breezevoice),reference_audio_path,reference_transcript,tempo,active。可選:測試合成按鈕(呼叫 shared.voice.synthesize 產一小段試聽 ogg)。\n2) 用戶管理:列出 users(分頁/搜尋),檢視單一用戶設定;可切換 nsfw_opt_in、voice_enabled、指派 voice_slug。\n3) 對話檢視(唯讀):某用戶最近 N 筆 conversation_turns;以及該用戶 user_profile(人物誌)摘要。\n4) 基本指標:用戶數、今日訊息數、啟用語音人數、LLM 與 BreezyVoice /health 連線狀態(打 ollama_base_url、breezyvoice_base_url)。\n技術:FastAPI + Jinja2(templates/) + python-multipart(表單);新增依賴 fastapi、uvicorn[standard]、python-multipart。沿用 shared.config、shared.db(asyncpg/SQLAlchemy session)、shared.models(User,Voice)、shared.repositories(UserRepository,VoiceRepository)。入口 admin/__main__.py 跑 uvicorn,host 0.0.0.0 port 8090。所有頁面經 Basic Auth 依賴保護。\n部署:在 coolify/ 的 compose 增加 admin 服務(同 image 或同 repo),只映射區網埠,設 ADMIN_USER/ADMIN_PASS env;**不要**設 fqdn/對公網路由(維持 LAN-only)。\n安全:Basic Auth 必填且比對 env;無 env 時拒絕啟動或全部 401。不得把後台暴露到公網(沿用先前安全決策)。\n注意:personas 目前是程式碼定義(orchestrator/persona.py),非 DB;本任務先做 voices/users/對話/指標,persona 的完整 CRUD 等 #26 DB 化後再加(本任務可顯示目前 persona 清單為唯讀)。",
         "testStrategy": "pytest + httpx ASGITransport 測 FastAPI app:未帶 Basic Auth → 401;帶正確帳密 → 200。voices CRUD:POST 新增→出現在列表;PATCH 改 active→生效;DELETE→消失(mock 或測試 DB)。用戶頁:設定 voice_slug 後 DB 更新。健康指標頁能渲染(mock LLM/TTS health)。確認 admin 服務未設 fqdn(LAN-only)。",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T15:01:47.288Z"
       },
       {
         "id": "8",
@@ -283,14 +284,15 @@
         "id": "21",
         "title": "VIP 月訂閱",
         "description": "Recurring monthly VIP via Telegram Stars subscriptions with entitlements.",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           "19"
         ],
         "priority": "high",
         "details": "Stars subscription via subscription_period=2592000 (30d). subscriptions table (user_id, status, current_period_end). Entitlements: unlimited chat / NSFW / higher media quota. Handle renewal, cancellation, and failed-renewal grace. Gate features by active subscription.",
         "testStrategy": "Create subscription -> entitlements active; simulate renew & cancel -> entitlements toggle correctly; expired sub revokes VIP features.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T15:15:42.417Z"
       },
       {
         "id": "22",
@@ -469,9 +471,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T10:09:44.764Z",
+      "lastModified": "2026-06-18T15:15:42.417Z",
       "taskCount": 33,
-      "completedCount": 9,
+      "completedCount": 10,
       "tags": [
         "master"
       ]

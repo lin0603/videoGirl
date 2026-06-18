@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from shared.config import Settings
 from shared.db import _asyncpg_to_asyncpg_url
@@ -63,3 +63,20 @@ def db_engine():
     engine = create_async_engine(_asyncpg_to_asyncpg_url(settings.postgres_url), future=True)
     yield engine
     engine.sync_engine.dispose()
+
+
+@pytest.fixture
+async def db_session(db_engine):
+    """Provide a database session that rolls back after each test."""
+    connection = await db_engine.connect()
+    transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        autoflush=False,
+        autocommit=False,
+    )
+    yield session
+    await session.close()
+    await transaction.rollback()
+    await connection.close()

@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from orchestrator.core import respond
 from orchestrator.persona import get_persona
 from shared.logging import get_logger
+from shared.repositories.subscription_repo import EntitlementService
 from shared.repositories.user_repo import UserRepository
 from shared.repositories.voice_repo import VoiceRepository
 from shared.voice import VoiceConfig, VoiceError, synthesize
@@ -30,7 +31,15 @@ def get_router() -> Router:
             return
 
         persona = get_persona()
-        nsfw = user.nsfw_opt_in and user.age_verified_at is not None
+        entitlements = EntitlementService(session)
+        nsfw_allowed = await entitlements.nsfw_allowed(user)
+        nsfw = user.nsfw_opt_in and user.age_verified_at is not None and nsfw_allowed
+
+        if user.nsfw_opt_in and not nsfw_allowed:
+            await message.answer(
+                "你已開啟 NSFW，但需要 VIP 訂閱才能解鎖成人內容喔。\n"
+                "輸入 /subscribe 訂閱 VIP 月方案 💎"
+            )
 
         try:
             reply_text = await respond(

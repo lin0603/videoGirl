@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     admin_secret_key: str = "change-me-in-production"
     admin_host: str = "0.0.0.0"
     admin_port: int = 8000
+
+    # --- VIP subscription (task #21) ---
+    vip_amount_stars: int = 199
+    vip_subscription_period_seconds: int = 2592000  # 30 days
+    vip_grace_period_seconds: int = 259200  # 3 days
     # Comma-separated Telegram user ids allowed to run admin bot commands
     # (e.g. /refund_stars). Empty = nobody (refunds disabled via bot).
     admin_telegram_ids: str = ""
