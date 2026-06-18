@@ -14,6 +14,8 @@ Telegram **NSFW Traditional-Chinese (zh-TW)** AI girlfriend service. Differentia
 - **Media on the rented 4090 (via Tailscale)**: ComfyUI (NSFW images + per-persona LoRA); image-to-video (Wan2.2/Hunyuan). **GPU media queue** (Redis + Celery/RQ) serializes 4090 work, priority **photo > video**, VRAM-aware load/unload. The LLM is NOT in this queue.
 - **Voice**: **BreezyVoice** TTS (zh-TW) on the 4090 (or Mac if light).
 - **Proactive engine**: APScheduler (good-morning/night, reminders, notes).
+- **Companion soul (first priority, tasks #5/#12/#13/#32/#33/#26)**: user dossier memory (remembers your personality + life facts), life-assistant reminders (tax/electricity, recurring, in-voice), special-dates + proactive gift image (#33), routine-aware care check-ins ("你在做什麼?"), an internal **mood model** (#32) that shifts with interaction and colors tone, and multiple/custom personas (#26).
+- **Monetization = Telegram Stars only** (XTR): payments core/wallet/VIP subscription/unlocks/gifts/referral funnel/gacha (#19–#26). **Mini App** (#27–#30) needs public HTTPS via **Cloudflare Tunnel** from the Coolify box (bot stays long-polling); validate Mini App `initData` via HMAC. Keep ALL public surfaces SFW; Stars payouts via Fragment (min 1,000, 21-day hold) and can be frozen — see #31.
 
 ## Hardware
 - **Coolify Linux box (home)** = persistent app + DB tier. **Mac mini (home LAN)** = persistent LLM. **RTX 4090 (ssh ai.bygpu.com, Tailscale)** = **disposable** GPU, wiped on rental expiry — run ONLY ComfyUI/video/voice there; never store the only copy of code there.

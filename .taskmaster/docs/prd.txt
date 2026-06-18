@@ -69,6 +69,21 @@ Differentiator vs. existing AI girlfriend products: combine romantic companionsh
 - Posting flow: persona composes a post (text + optional image) -> schedule -> publish to a Facebook Page; review/approval step; rate limits.
 - Risk controls: content policy filtering, manual approval gate, account-suspension safeguards.
 
+### Companion Soul (first-priority depth — strengthens P1/P2; tasks #5,#12,#13,#32,#33,#26)
+The core differentiator is an emotionally-present companion that doubles as a life assistant:
+- User dossier + memory (#5): explicitly extract & store the user's personality traits, preferences, speech quirks, and life facts (birthday, job, routine, recurring bill due-dates), not just vectors — so she reliably "remembers who you are".
+- Life-assistant reminders (#13): natural-language, recurring real-life reminders (pay tax, electricity bill), delivered in the girlfriend's voice, not a cold system message.
+- Special dates + proactive gift image (#33): remember birthdays/anniversaries; on the day, proactively wish + generate & send a "gift" image (cake/flowers/gift).
+- Proactive care (#12): routine-aware check-ins — "你在做什麼?" / "吃飯了嗎?" / "今天還好嗎?" — respecting quiet hours.
+- Companion mood/emotion (#32): an internal mood (happy/missing/jealous/down) that shifts with interaction (long silence → longing/sulk; warm chat → affectionate) and colors both replies and proactive messages; decays to baseline.
+- Multiple personas / create-your-own (#26): several selectable personas with distinct personality/voice/appearance.
+
+### Phase 5 — Monetization & Growth (tasks #19–#26, layered after the companion works)
+Telegram Stars only (XTR): #19 payments core (invoice→pre_checkout→successful_payment, idempotent, refunds, /paysupport+/terms); #20 credit wallet (media debits credits); #21 VIP monthly subscription (30-day Stars subscription); #22 pay-per-unlock + Stars gifts; #23 deep-link funnel (?start= attribution) + referral + SFW teaser channel; #24 gamified intimacy/streak; #25 gacha photo packs. Public surfaces stay strictly SFW.
+
+### Phase 6 — Mini App (tasks #27–#30)
+Telegram Mini App needs public HTTPS via Cloudflare Tunnel from the Coolify box (bot stays long-polling). #27 infra (Tunnel), #28 initData HMAC validation, #29 React + @telegram-apps frontend (gallery/persona/subscription/wallet/Stars openInvoice), #30 backend API. #31 compliance + Stars payout safety (Fragment min 1,000 / 21-day hold; freeze contingency).
+
 ## 7. Cross-Cutting Requirements
 - Adult-only enforcement: age gate at onboarding, NSFW opt-in toggle, content separation (SFW default).
 - Safety: refuse illegal content (CSAM etc.); content filters on both LLM output and image/video generation.

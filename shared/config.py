@@ -20,6 +20,18 @@ class Settings(BaseSettings):
     model_name: str
     log_level: str = "INFO"
 
+    # --- Switchable LLM backends (see shared/llm.py) ---
+    # Active profile name from the registry in shared/llm.py.
+    llm_profile: str = "mac-qwen9b"
+    llm_timeout_secs: int = 120
+    llm_max_retries: int = 3
+    # Optional OpenAI-compatible backend (vLLM on 4090 / Kimi / OpenRouter).
+    # Filled only when you switch llm_profile to one that uses it.
+    openai_compat_base_url: str = ""
+    openai_compat_api_key: str = ""
+    openai_compat_model: str = ""
+    vllm_base_url: str = ""
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

@@ -5,13 +5,13 @@
         "id": "1",
         "title": "Project scaffolding + infra (Coolify-deployable: Postgres+pgvector, Redis)",
         "description": "Initialize the monorepo structure, Python 3.11+ asyncio environment, pydantic-settings config, structured logging, and a Coolify-deployable layout (Nixpacks/Dockerfile) with PostgreSQL (pgvector) and Redis as Coolify services.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "details": "Create package layout: bot/, orchestrator/, workers/, shared/, infra/. Target deploy = self-hosted Coolify on a home Linux box (Docker runtime managed by Coolify, not hand-written compose). Provide a Nixpacks-friendly app + optional Dockerfile; Postgres (pgvector) and Redis provisioned as Coolify one-click services. Postgres init: CREATE EXTENSION vector. Provide a local docker-compose ONLY for dev convenience (optional). Config via pydantic-settings (telegram_token, postgres_url, redis_url, ollama_base_url [Mac mini LAN IP], comfyui_base_url [4090 via Tailscale], breezyvoice_base_url, embedding_model, log_level, model_name). Structured JSON logging via structlog. Keep .env (gitignored) as the single secrets source; document Coolify env vars.",
         "testStrategy": "App builds under Nixpacks/Dockerfile; deploys on Coolify with Postgres+Redis services healthy; pytest connectivity test connects to Postgres with pgvector enabled and pings Redis; settings load fails loudly on missing required fields.",
         "subtasks": [],
-        "updatedAt": "2026-06-18T02:25:03.076Z"
+        "updatedAt": "2026-06-18T03:22:46.045Z"
       },
       {
         "id": "2",
@@ -55,14 +55,14 @@
       {
         "id": "5",
         "title": "Memory system: conversation history + pgvector long-term memory",
-        "description": "Sliding-window conversation history, pgvector semantic memory for facts/preferences/relationship state, salient-fact extraction, and retrieval for prompt injection.",
+        "description": "Conversation history + pgvector long-term memory PLUS an explicit structured user dossier (personality traits, preferences, life facts) for reliable recall.",
         "status": "pending",
         "dependencies": [
           "1",
           "4"
         ],
         "priority": "high",
-        "details": "conversation_turns table (user_id, role, content, tokens_estimate, created_at) retrieved by token budget. memories table with embedding VECTOR + ivfflat cosine index, memory_type, importance_score. Embeddings via bge-m3 / nomic-embed (Ollama). After each turn: LLM extracts facts/relationship updates -> embed + upsert. Before each reply: embed query -> top-K retrieve -> format into prompt. user_relationships: intimacy_level, affection_score, streak_days, special_dates JSONB.",
+        "details": "conversation_turns table (user_id, role, content, tokens_estimate, created_at) retrieved by token budget. memories table with embedding VECTOR + ivfflat cosine index, memory_type, importance_score (embeddings via bge-m3/nomic on Coolify CPU). ENHANCED — build an explicit USER DOSSIER: each turn the LLM extracts structured {facts, preferences, personality_traits, speech_quirks, life_facts(birthday, job, routine, recurring bills due-dates)} -> upsert. Store traits/preferences in a queryable user_profile table (not only as vectors) so persona can reliably 'remember your personality'. Before each reply: semantic top-K retrieve + inject the dossier summary into the prompt. user_relationships: intimacy_level, affection_score, streak_days, special_dates JSONB.",
         "testStrategy": "Insert/retrieve roundtrip returns semantically relevant memories; sliding window respects token budget; relationship counters update across turns; recall persists across sessions.",
         "subtasks": []
       },
@@ -150,27 +150,27 @@
       {
         "id": "12",
         "title": "Proactive engine: scheduled, AI-initiated messages",
-        "description": "APScheduler-based engine that proactively messages users (good-morning/night, missing-you, event-based) with per-user quiet hours and opt-in/out.",
+        "description": "Proactive CARE engine: routine-aware check-ins (what are you doing / eaten yet / how are you) + good-morning/night, in persona voice & current mood.",
         "status": "pending",
         "dependencies": [
           "6",
           "8"
         ],
         "priority": "high",
-        "details": "This is the key competitive differentiator (assistant-hybrid). APScheduler (or Celery beat) jobs per user. Message types: daily check-ins, time-based, relationship-event-based. Quiet hours + frequency caps + opt-out. Generated through the orchestrator so persona/memory apply. Can attach voice/photo via the queue.",
+        "details": "APScheduler/Celery-beat per-user proactive jobs through the orchestrator (persona + memory + mood applied). Message types beyond good-morning/night: CARE check-ins — '你在做什麼?' '吃飯了嗎?' '今天還好嗎?' — chosen by time-of-day, user routine, and time-since-last-interaction. Respect quiet hours + frequency caps + opt-out. Can attach voice/photo via the media queue. Feeds off mood (#32) so tone matches the companion's current emotion.",
         "testStrategy": "Scheduled good-morning fires at the user's local time within quiet-hour rules; opt-out stops proactive messages; proactive text is persona-consistent and memory-aware.",
         "subtasks": []
       },
       {
         "id": "13",
         "title": "Reminders & notes (natural language)",
-        "description": "Let users create reminders and notes in natural language and have the persona deliver/recall them via the proactive engine.",
+        "description": "Life-assistant reminders in natural language incl. recurring real-life bills (tax, electricity), delivered in the girlfriend's voice.",
         "status": "pending",
         "dependencies": [
           "12"
         ],
         "priority": "medium",
-        "details": "Parse '提醒我...' / note intents from chat (LLM structured extraction). reminders + notes tables (content, due_at, recurrence, status). Scheduled delivery through the proactive engine in persona voice. Recall/query notes on request. Edit/cancel flows.",
+        "details": "Natural-language reminder creation ('提醒我月底繳稅', '每月15號電費', '幫我記得倒垃圾'). reminders table: content, due_at, recurrence(once/daily/weekly/monthly/yearly), type(bill/tax/chore/custom), status. LLM parses intent + datetime + recurrence (TW timezone). Due reminders delivered by the proactive engine in the GIRLFRIEND'S VOICE (warm, not a cold system message). Recall/list/edit/cancel via chat. Pairs with the user dossier (#5) so recurring life bills (tax, electricity) are remembered long-term.",
         "testStrategy": "A NL reminder schedules and fires at the right time in persona voice; recurring reminders repeat; notes are stored and recalled accurately; cancel works.",
         "subtasks": []
       },
@@ -240,13 +240,228 @@
         "details": "Phase 4, gated on research: confirm Meta Graph API policy + account-suspension risk for automated AI posting (personal vs Page); decide build vs Post Bridge MCP. Flow: persona composes post (text + optional image) -> manual approval gate -> publish to Page -> rate limits + content filtering. Do NOT ship without the policy review.",
         "testStrategy": "Policy review documented before build; a composed post requires manual approval before publishing; rate limits enforced; publishing to a test Page succeeds; suspension safeguards in place.",
         "subtasks": []
+      },
+      {
+        "id": "19",
+        "title": "Telegram Stars 付款核心",
+        "description": "Accept Telegram Stars for digital goods: invoice -> pre_checkout -> successful_payment, idempotent, refunds, mandatory /paysupport & /terms.",
+        "status": "pending",
+        "dependencies": [
+          "2",
+          "6"
+        ],
+        "priority": "high",
+        "details": "Use createInvoiceLink/sendInvoice with currency XTR and empty provider_token. Handle pre_checkout_query (answerPreCheckoutQuery within 10s). On successful_payment: verify + store telegram_payment_charge_id; make delivery IDEMPOTENT (dedupe by charge_id). Implement refundStarPayment. Implement required /paysupport and /terms commands. transactions table (user_id, charge_id, amount_stars, product, status, created_at).",
+        "testStrategy": "Test-mode Stars flow completes invoice->pre_checkout->successful_payment; re-delivery of same charge_id does not double-credit; refundStarPayment works; /paysupport & /terms respond.",
+        "subtasks": []
+      },
+      {
+        "id": "20",
+        "title": "點數錢包 (credits)",
+        "description": "Stars-funded credit wallet; media generation (photo/voice/video) debits credits atomically.",
+        "status": "pending",
+        "dependencies": [
+          "19",
+          "8",
+          "10"
+        ],
+        "priority": "high",
+        "details": "wallets(user_id, balance) + ledger(entry_id, user_id, delta, reason, ref) with atomic transactions. Top-up: buy credits with Stars (#19). Debit on each media job (photo/voice/video) tied to GPU cost; block + friendly prompt when insufficient. Expose balance in chat and Mini App.",
+        "testStrategy": "Top-up adds credits; generating an image debits the right amount atomically; concurrent debits never go negative; insufficient balance is blocked with a prompt.",
+        "subtasks": []
+      },
+      {
+        "id": "21",
+        "title": "VIP 月訂閱",
+        "description": "Recurring monthly VIP via Telegram Stars subscriptions with entitlements.",
+        "status": "pending",
+        "dependencies": [
+          "19"
+        ],
+        "priority": "high",
+        "details": "Stars subscription via subscription_period=2592000 (30d). subscriptions table (user_id, status, current_period_end). Entitlements: unlimited chat / NSFW / higher media quota. Handle renewal, cancellation, and failed-renewal grace. Gate features by active subscription.",
+        "testStrategy": "Create subscription -> entitlements active; simulate renew & cancel -> entitlements toggle correctly; expired sub revokes VIP features.",
+        "subtasks": []
+      },
+      {
+        "id": "22",
+        "title": "單次解鎖 + 虛擬禮物",
+        "description": "Pay Stars to unlock specific media; users send Stars gifts that boost intimacy/mood.",
+        "status": "pending",
+        "dependencies": [
+          "19",
+          "32"
+        ],
+        "priority": "medium",
+        "details": "Pay-per-unlock: lock specific photo/video/voice behind a Stars price; unlock recorded per user. Gift catalog: user sends a Stars gift to the girlfriend -> raises intimacy (#24) and shifts mood positively (#32) -> persona reacts warmly.",
+        "testStrategy": "Unlocking grants persistent access to that item; sending a gift visibly boosts intimacy/mood and elicits an in-character reaction.",
+        "subtasks": []
+      },
+      {
+        "id": "23",
+        "title": "深連結漏斗 + 推薦",
+        "description": "Deep-link funnel (?start= attribution) + referral rewards + SFW teaser channel auto-post.",
+        "status": "pending",
+        "dependencies": [
+          "2",
+          "12"
+        ],
+        "priority": "high",
+        "details": "Parse /start payload (source + referrer id) -> attribution table. Referral rewards (Stars/VIP days) when referred user activates. A PUBLIC SFW teaser channel (bot as admin) auto-posts teaser content on schedule with deep-link buttons t.me/<bot>?start=ref_<id>. Public surface stays strictly SFW (compliance #31).",
+        "testStrategy": "t.me/bot?start=ref_<id> opens bot and writes attribution; referral reward granted on activation; teaser channel auto-posts SFW with working deep-link button.",
+        "subtasks": []
+      },
+      {
+        "id": "24",
+        "title": "遊戲化親密度",
+        "description": "Intimacy/affinity levels + daily streak; levels gate more-intimate content.",
+        "status": "pending",
+        "dependencies": [
+          "5",
+          "6",
+          "12"
+        ],
+        "priority": "medium",
+        "details": "intimacy_level + affection_score + streak_days on user_relationships (#5). Daily interaction raises streak; inactivity decays. Levels unlock more intimate content/replies. Complements the mood model (#32). Surface progress in chat and Mini App.",
+        "testStrategy": "Daily interaction increments streak; reaching a level unlocks gated content; long inactivity decays score.",
+        "subtasks": []
+      },
+      {
+        "id": "25",
+        "title": "抽卡照片包 (Gacha)",
+        "description": "Stars-priced random NSFW photo/pose pack draws with rarity + collection.",
+        "status": "pending",
+        "dependencies": [
+          "20",
+          "10",
+          "11"
+        ],
+        "priority": "medium",
+        "details": "Gacha: spend Stars/credits to draw a random generated NSFW photo/pose with rarity tiers; store to user's collection/inventory. Reuse persona LoRA (#11) for character consistency. Show pity/odds transparently.",
+        "testStrategy": "A draw debits Stars/credits, returns a character-consistent image of the right rarity, and saves it to the user's collection.",
+        "subtasks": []
+      },
+      {
+        "id": "26",
+        "title": "多人設 / 自訂女友",
+        "description": "Multiple selectable personas and create-your-own (appearance/personality/voice).",
+        "status": "pending",
+        "dependencies": [
+          "4",
+          "11"
+        ],
+        "priority": "medium",
+        "details": "Let a user own/select multiple personas; switch active one. Create-your-own: choose appearance (-> per-persona LoRA #11), personality, speaking style, voice (#9). Persists per user; each persona has its own memory/mood scope.",
+        "testStrategy": "Switching persona clearly changes personality/voice/appearance; a user-created persona persists and stays in character.",
+        "subtasks": []
+      },
+      {
+        "id": "27",
+        "title": "Mini App 基礎設施",
+        "description": "Public HTTPS for the Mini App via Cloudflare Tunnel from the Coolify box; serve static frontend.",
+        "status": "pending",
+        "dependencies": [
+          "1"
+        ],
+        "priority": "medium",
+        "details": "Mini App needs a public HTTPS URL. Use Cloudflare Tunnel (no open ports, works behind home NAT) from the Coolify host to serve the Mini App. Set CSP/CORS. Bot itself stays on long polling; only the Mini App web is exposed.",
+        "testStrategy": "Mini App URL loads over HTTPS through Cloudflare Tunnel; no inbound ports opened on the home box.",
+        "subtasks": []
+      },
+      {
+        "id": "28",
+        "title": "Mini App 身分驗證",
+        "description": "Server-side validation of Telegram initData (HMAC-SHA256 with bot token).",
+        "status": "pending",
+        "dependencies": [
+          "27",
+          "2"
+        ],
+        "priority": "high",
+        "details": "Validate WebApp initData: HMAC-SHA256 using the bot token secret per Telegram spec; reject tampered/expired initData; issue a short-lived session for API calls. Never trust client-supplied user id.",
+        "testStrategy": "Valid initData passes and yields a session; tampered/expired initData is rejected; forged user id cannot access another user's data.",
+        "subtasks": []
+      },
+      {
+        "id": "29",
+        "title": "Mini App 前端",
+        "description": "React + @telegram-apps SDK: home, photo/album gallery, persona picker/builder, subscription & credits, Stars payment.",
+        "status": "pending",
+        "dependencies": [
+          "28",
+          "19",
+          "26"
+        ],
+        "priority": "medium",
+        "details": "React + @telegram-apps/sdk. Screens: home/relationship status, photo & album gallery (unlocked/gacha), persona picker + create-your-own, subscription + credits management, Stars payment via openInvoice. Fullscreen + theme aware. Public store page stays SFW.",
+        "testStrategy": "In Telegram, user can browse gallery, switch/create persona, view wallet/sub, and complete a Stars purchase via openInvoice.",
+        "subtasks": []
+      },
+      {
+        "id": "30",
+        "title": "Mini App ↔ 後端 API",
+        "description": "Backend API for gallery, persona CRUD, wallet/subscription status, unlock actions; reuse orchestrator/DB.",
+        "status": "pending",
+        "dependencies": [
+          "29",
+          "20",
+          "21"
+        ],
+        "priority": "medium",
+        "details": "Authenticated (#28) endpoints: list gallery/collection, persona CRUD, wallet+subscription status, unlock/purchase actions. Reuse orchestrator + DB models; enforce entitlements server-side.",
+        "testStrategy": "Each endpoint requires a valid session, returns correct per-user data, and enforces entitlements (no unlocking without payment).",
+        "subtasks": []
+      },
+      {
+        "id": "31",
+        "title": "合規 + 提領安全",
+        "description": "Keep public surfaces SFW, 18+ gating, refunds/terms, Stars payout monitoring & freeze contingency.",
+        "status": "pending",
+        "dependencies": [
+          "17",
+          "19"
+        ],
+        "priority": "high",
+        "details": "Cross-cutting: public channel/bot description/Mini App store page strictly SFW; 18+ gate enforced everywhere; /paysupport & /terms present; refunds honored. Monitor Stars balance + Fragment payout constraints (min 1,000 Stars, 21-day hold). Keep transaction records; plan for balance-freeze/ban contingency (diversified payout, backups).",
+        "testStrategy": "No NSFW on any public surface; non-opted users never get explicit content; payout thresholds tracked; refund path verified.",
+        "subtasks": []
+      },
+      {
+        "id": "32",
+        "title": "女友情緒 / 心情模型",
+        "description": "Companion has an internal mood (happy/missing/jealous/down) that shifts with interaction and colors tone.",
+        "status": "pending",
+        "dependencies": [
+          "4",
+          "5",
+          "6"
+        ],
+        "priority": "high",
+        "details": "companion_mood per (user, persona): dimensions like affection/longing/playfulness/upset. Updated by events: long no-reply -> longing/slightly upset; frequent warm chat -> happy/affectionate; gifts (#22) -> positive. Decays back toward baseline over time. Mood injected into the system prompt so replies AND proactive messages (#12) reflect current emotion.",
+        "testStrategy": "After deliberate silence the next reply carries longing/mild sulk; warm interaction shifts tone affectionate; mood decays to baseline over time; proactive messages reflect current mood.",
+        "subtasks": []
+      },
+      {
+        "id": "33",
+        "title": "特殊日子 + 主動送禮物圖",
+        "description": "Remember birthdays/anniversaries; on the day, proactively wish + send an AI-generated gift image.",
+        "status": "pending",
+        "dependencies": [
+          "5",
+          "10",
+          "12"
+        ],
+        "priority": "high",
+        "details": "special_dates table (user_id, type[birthday/anniversary/custom], date, recurrence). Populate from conversation extraction (#5) or explicit user setting. Scheduler (#12): on the day, send a warm in-character greeting + call the media pipeline (#10) to generate a 'gift' image (cake/flowers/gift/selfie-with-user) and push it. Respect NSFW opt-in for image style.",
+        "testStrategy": "Setting a birthday triggers, on that date, a proactive greeting plus a generated gift image; recurring yearly; respects quiet hours.",
+        "subtasks": []
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T02:25:03.076Z",
-      "taskCount": 18,
-      "completedCount": 0,
+      "lastModified": "2026-06-18T03:22:46.045Z",
+      "taskCount": 33,
+      "completedCount": 1,
       "tags": [
         "master"
       ]
