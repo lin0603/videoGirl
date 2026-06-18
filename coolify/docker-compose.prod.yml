@@ -1,0 +1,53 @@
+# Production Docker Compose for self-hosting or Coolify.
+# This stack includes the Telegram bot worker, PostgreSQL with pgvector, and Redis.
+# No HTTP port is exposed because the bot communicates via Telegram's long-polling.
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: videogirl-bot
+    environment:
+      # Override local dev defaults to use the compose service hostnames.
+      # All other env vars (telegram_token, ollama_base_url, etc.) are injected
+      # by Coolify or passed with `docker compose --env-file .env up -d`.
+      postgres_url: postgresql://videogirl:${POSTGRES_PASSWORD:-videogirl}@postgres:5432/videogirl
+      redis_url: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    # Coolify web-based healthchecks expect an HTTP path; this worker has none.
+    # The Dockerfile's HEALTHCHECK command handles container-level checks.
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: videogirl-postgres
+    environment:
+      POSTGRES_USER: videogirl
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-videogirl}
+      POSTGRES_DB: videogirl
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U videogirl -d videogirl"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: videogirl-redis
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
