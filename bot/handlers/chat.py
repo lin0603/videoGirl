@@ -5,7 +5,8 @@ from orchestrator.core import respond
 from orchestrator.persona import get_persona
 from shared.logging import get_logger
 from shared.repositories.user_repo import UserRepository
-from shared.voice import VoiceError, synthesize, voice_config_from_user
+from shared.repositories.voice_repo import VoiceRepository
+from shared.voice import VoiceConfig, VoiceError, synthesize
 
 logger = get_logger("bot.chat")
 
@@ -47,7 +48,14 @@ def get_router() -> Router:
 
         if user.voice_enabled:
             try:
-                voice_cfg = voice_config_from_user(user)
+                # Resolve the user's chosen voice category from the admin catalog.
+                voice_row = await VoiceRepository(session).get(user.voice_slug)
+                voice_cfg = VoiceConfig(
+                    provider="breezevoice",
+                    speed=user.voice_speed * (voice_row.tempo if voice_row else 1.0),
+                    reference_audio_path=voice_row.reference_audio_path if voice_row else None,
+                    reference_transcript=voice_row.reference_transcript if voice_row else None,
+                )
                 voice_bytes = await synthesize(reply_text, voice_cfg)
                 await message.answer_voice(
                     types.BufferedInputFile(voice_bytes, filename="voice.ogg")

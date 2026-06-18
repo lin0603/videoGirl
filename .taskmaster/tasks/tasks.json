@@ -115,16 +115,18 @@
       },
       {
         "id": "9",
-        "title": "BreezyVoice TTS service: zh-TW voice messages",
-        "description": "Deploy BreezyVoice on the 4090, generate zh-TW voice for the persona, encode to Telegram voice (.ogg/opus), and let the orchestrator decide when to reply with voice.",
-        "status": "pending",
+        "title": "語音回覆 (TTS, BreezyVoice only):文字→語音傳回,後台可設語音類別",
+        "description": "把文字回覆用 BreezyVoice(4090 已部署)轉成語音,轉 OGG/Opus 後以 Telegram sendVoice 傳回。語音類別=參考音檔(speaker_prompt_audio_path)+逐字稿,後台可設、每人設可綁。TTS 只用 BreezyVoice;失敗退回純文字(不退 edge-tts)。",
+        "status": "in-progress",
         "dependencies": [
+          "6",
           "8"
         ],
         "priority": "medium",
-        "details": "BreezyVoice (CosyVoice-based) service with per-persona reference voice (default_voice_seed). text -> wav -> ogg/opus for Telegram sendVoice. Orchestrator policy for when to send voice vs text. Run as a queue worker (light GPU footprint). Cache repeated phrases.",
-        "testStrategy": "Generated voice plays natively as a Telegram voice message; zh-TW pronunciation is correct; persona voice is consistent; latency acceptable under the queue.",
-        "subtasks": []
+        "details": "已驗證:4090 在線(ai.bygpu.com:52406, user bygpu, RTX 4090 48GB),BreezyVoice 跑在 127.0.0.1:7868(uvicorn breezyvoice_api:app,部署 /home/bygpu/mentorai-breezyvoice,/health=ok,model BreezyVoice-300M)。沿用此 API(同 mentorAI scripts/gpu/breezyvoice_api.py)。\n- API:POST /v1/tts(202→job)→輪詢 GET /v1/jobs/{id}→GET /v1/audio/{id} 下載 wav/mp3;POST /v1/voices 克隆註冊;GET /v1/options。TtsRequest:text, speaker_prompt_text(逐字稿), speaker_prompt_audio_path(參考音=語音類別), output_format(wav|mp3), tempo(0.5-2.0 語速), target_lufs/true_peak/lra(loudnorm), mp3_quality, sample_rate。\n- shared/tts.py:BreezyVoiceProvider(httpx:submit→poll→download),唯一 provider;失敗(模型載入/逾時/記憶體)→丟例外,bot 退回純文字並記錄。\n- 輸出轉 Telegram 語音:ffmpeg -i in.(wav|mp3) -af loudnorm=I=-16:TP=-1.5:LRA=11 -c:a libopus -b:a 48k -ar 48000 out.ogg → sendVoice。\n- 後台可設語音類別:voices 表(slug,name,speaker_prompt_audio_path,speaker_prompt_text,tempo,target_lufs,gender,emotion,nsfw_ok,active);personas.default_voice_slug 綁定;admin(#7)CRUD/指派/調語速;新增類別=放參考 WAV 或 /v1/voices enroll(上傳參考音+逐字稿→取回路徑)。現有參考音:inputs/prompt-60-75s-16k.wav、prompt-ref-8s.wav。\n- 連線:服務綁 127.0.0.1,需 Tailscale 或 SSH 反向隧道讓 Coolify/家機連到 4090:7868;設 breezyvoice_base_url(現 .env 的 ai.bygpu.com:8080 為錯誤佔位,需更正)+ breezyvoice_token。\n- BreezyVoice 慢(每段約 40-72s)→ 經 GPU 佇列 #8 非同步,先回文字、語音稍後補送;快取相同 text+voice。config:breezyvoice_base_url、breezyvoice_token、tts_timeout_secs。需 ffmpeg。",
+        "testStrategy": "BreezyVoiceProvider 對 4090 /v1/tts 走完 submit→poll→download,ffmpeg 轉 OGG/Opus,Telegram 顯示成可播放 zh-TW 語音訊息;切換 speaker_prompt_audio_path(不同語音類別)音色改變;後台改人設 default_voice_slug → 下次音色改變;BreezyVoice 失敗 → 退回純文字並記錄;pytest mock provider 驗 job 輪詢、ogg 轉檔、失敗降級。",
+        "subtasks": [],
+        "updatedAt": "2026-06-18T07:55:16.439Z"
       },
       {
         "id": "10",
@@ -464,7 +466,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T04:41:13.605Z",
+      "lastModified": "2026-06-18T07:55:16.439Z",
       "taskCount": 33,
       "completedCount": 6,
       "tags": [

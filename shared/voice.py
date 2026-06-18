@@ -33,7 +33,7 @@ FALLBACK_VOICE = "zh-TW-HsiaoChenNeural"
 
 @dataclass
 class VoiceConfig:
-    provider: VoiceProvider = "edge-tts"
+    provider: VoiceProvider = "breezevoice"
     speed: float = 1.0
     reference_audio_url: str | None = None
     reference_audio_path: str | None = None
@@ -198,9 +198,7 @@ async def _synthesize_breezyvoice(text: str, config: VoiceConfig) -> bytes:
         headers["authorization"] = f"Bearer {token}"
 
     clean_text = tts_clean_text(text) or text
-    job_id = f"videogirl-{asyncio.get_event_loop().time():.0f}"
     body: dict = {
-        "job_id": job_id,
         "text": clean_text,
         "output_format": "mp3",
     }
@@ -215,10 +213,14 @@ async def _synthesize_breezyvoice(text: str, config: VoiceConfig) -> bytes:
         submit = await client.post(
             f"{base}/v1/tts", json=body, headers=headers
         )
-        if submit.status_code != 200:
+        # /v1/tts returns 202 Accepted with the job descriptor.
+        if submit.status_code >= 300:
             raise VoiceError(
                 f"breezyvoice submit {submit.status_code}: {submit.text[:200]}"
             )
+        job_id = submit.json().get("job_id")
+        if not job_id:
+            raise VoiceError(f"breezyvoice: no job_id in {submit.text[:200]}")
 
         deadline = asyncio.get_event_loop().time() + 15 * 60
         while asyncio.get_event_loop().time() < deadline:
@@ -269,7 +271,7 @@ async def synthesize(text: str, config: VoiceConfig | None = None) -> bytes:
 def voice_config_from_user(user) -> VoiceConfig:
     """Build VoiceConfig from a User ORM object."""
     return VoiceConfig(
-        provider=user.voice_provider or "edge-tts",  # type: ignore[arg-type]
+        provider=user.voice_provider or "breezevoice",  # type: ignore[arg-type]
         speed=max(0.5, min(2.0, user.voice_speed or 1.0)),
         reference_audio_url=user.voice_reference_audio_url,
         reference_audio_path=user.voice_reference_audio_path,

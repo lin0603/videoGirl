@@ -21,9 +21,25 @@ class User(Base):
         DateTime(timezone=True), default=datetime.utcnow
     )
 
-    # Voice settings (task #9 integration)
+    # Voice settings (task #9 integration). TTS is BreezyVoice-only.
     voice_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
-    voice_provider: Mapped[str] = mapped_column(String(32), default="edge-tts")
+    voice_provider: Mapped[str] = mapped_column(String(32), default="breezevoice")
+    voice_slug: Mapped[str] = mapped_column(String(64), default="default")
     voice_speed: Mapped[float] = mapped_column(Float, default=1.0)
     voice_reference_audio_url: Mapped[str | None] = mapped_column(String(1024))
     voice_reference_audio_path: Mapped[str | None] = mapped_column(String(1024))
+
+
+class Voice(Base):
+    """Backend-configurable voice category catalog (admin-managed, task #7/#9)."""
+
+    __tablename__ = "voices"
+
+    slug: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    provider: Mapped[str] = mapped_column(String(32), default="breezevoice")
+    # None -> use the BreezyVoice server's built-in default reference voice.
+    reference_audio_path: Mapped[str | None] = mapped_column(String(1024))
+    reference_transcript: Mapped[str | None] = mapped_column(String(2048))
+    tempo: Mapped[float] = mapped_column(Float, default=1.0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)

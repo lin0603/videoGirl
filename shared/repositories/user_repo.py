@@ -92,3 +92,12 @@ class UserRepository:
             user.voice_reference_audio_path = reference_audio_path
         await self.session.commit()
         return user
+
+    async def set_voice_slug(self, telegram_id: int, slug: str) -> User | None:
+        user = await self.get_by_telegram_id(telegram_id)
+        if user is None:
+            return None
+        user.voice_slug = slug
+        user.voice_provider = "breezevoice"
+        await self.session.commit()
+        return user

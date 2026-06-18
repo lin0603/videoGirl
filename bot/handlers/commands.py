@@ -7,6 +7,7 @@ from bot.handlers.onboarding import start_onboarding
 from bot.states import OnboardingState
 from shared.logging import get_logger
 from shared.repositories.user_repo import UserRepository
+from shared.repositories.voice_repo import VoiceRepository
 
 logger = get_logger("bot.commands")
 
@@ -30,6 +31,8 @@ def get_router() -> Router:
             "/voice_on - 開啟語音回覆\n"
             "/voice_off - 關閉語音回覆\n"
             "/voice_settings - 查看語音設定\n"
+            "/voice_list - 列出可選的語音類別\n"
+            "/voice_set <類別> - 選擇語音類別\n"
             "/reset - 清除對話狀態"
         )
 
@@ -101,9 +104,40 @@ def get_router() -> Router:
         await message.answer(
             f"🎙️ 語音設定\n"
             f"狀態：{enabled}\n"
-            f"Provider：{user.voice_provider}\n"
+            f"語音類別：{user.voice_slug}\n"
             f"語速：{user.voice_speed}\n"
-            f"參考音檔：{user.voice_reference_audio_url or '無'}"
+            f"（用 /voice_list 看其他類別，/voice_set <類別> 切換）"
         )
+
+    @router.message(Command("voice_list"))
+    async def cmd_voice_list(message: types.Message, session: AsyncSession) -> None:
+        voices = await VoiceRepository(session).list_active()
+        if not voices:
+            await message.answer("目前沒有可用的語音類別。")
+            return
+        lines = "\n".join(f"・<code>{v.slug}</code> — {v.name}" for v in voices)
+        await message.answer(
+            "🎙️ 可選語音類別：\n" + lines + "\n\n用 /voice_set <類別> 選擇喔～",
+            parse_mode="HTML",
+        )
+
+    @router.message(Command("voice_set"))
+    async def cmd_voice_set(message: types.Message, session: AsyncSession) -> None:
+        parts = (message.text or "").split(maxsplit=1)
+        if len(parts) < 2:
+            await message.answer("用法：/voice_set <類別>（用 /voice_list 看有哪些）")
+            return
+        slug = parts[1].strip()
+        vrepo = VoiceRepository(session)
+        voice = await vrepo.get(slug)
+        if voice is None or not voice.active:
+            await message.answer(f"找不到語音類別「{slug}」，用 /voice_list 看看有哪些。")
+            return
+        repo = UserRepository(session)
+        if await repo.get_by_telegram_id(message.from_user.id) is None:
+            await message.answer("請先完成註冊：/start")
+            return
+        await repo.set_voice_slug(message.from_user.id, slug)
+        await message.answer(f"已把語音類別換成「{voice.name}」🎙️")
 
     return router
