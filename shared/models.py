@@ -18,9 +18,13 @@ class User(Base):
     age_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     nsfw_opt_in: Mapped[bool] = mapped_column(Boolean, default=False)
     locale: Mapped[str] = mapped_column(String(16), default="zh-TW")
+    timezone: Mapped[str] = mapped_column(String(64), default="Asia/Taipei")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
+
+    # Proactive engine (task #12)
+    proactive_opt_out: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Voice settings (task #9 integration). TTS is BreezyVoice-only.
     voice_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -112,6 +116,9 @@ class CompanionMood(Base):
     upset: Mapped[float] = mapped_column(Float, default=0.0)
     last_interaction_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
+    )
+    last_proactive_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow

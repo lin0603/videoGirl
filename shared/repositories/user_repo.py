@@ -101,3 +101,23 @@ class UserRepository:
         user.voice_provider = "breezevoice"
         await self.session.commit()
         return user
+
+    async def set_proactive_opt_out(
+        self, telegram_id: int, opt_out: bool
+    ) -> User | None:
+        user = await self.get_by_telegram_id(telegram_id)
+        if user is None:
+            return None
+        user.proactive_opt_out = opt_out
+        await self.session.commit()
+        return user
+
+    async def list_proactive_eligible(self) -> list[User]:
+        """Return age-verified users who have not opted out of proactive messages."""
+        result = await self.session.execute(
+            select(User).where(
+                User.age_verified_at.isnot(None),
+                User.proactive_opt_out.is_(False),
+            )
+        )
+        return list(result.scalars().all())

@@ -108,7 +108,7 @@
   "90": {
     "class_type": "VAELoader",
     "inputs": {
-      "vae_name": "wan_2.1_vae.safetensors"
+      "vae_name": "wan_2.1_vae_Comfy-Org.safetensors"
     },
     "_meta": {
       "title": "Wan2.1 VAE"

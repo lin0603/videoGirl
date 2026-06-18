@@ -44,9 +44,13 @@ def create_bot() -> Bot:
     )
 
 
-async def start_bot(shutdown_event: asyncio.Event | None = None) -> None:
-    bot = create_bot()
-    dp = create_dispatcher()
+async def start_bot(
+    shutdown_event: asyncio.Event | None = None,
+    bot: Bot | None = None,
+    dp: Dispatcher | None = None,
+) -> None:
+    bot = bot or create_bot()
+    dp = dp or create_dispatcher()
     logger.info("bot_starting")
     await db.connect()
     try:

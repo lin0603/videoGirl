@@ -10,9 +10,10 @@ import uvicorn
 from fastapi import FastAPI
 
 from admin.app import app as admin_app
-from bot.dispatcher import start_bot
+from bot.dispatcher import create_bot, create_dispatcher, start_bot
 from shared.config import get_settings
 from shared.logging import get_logger
+from shared.proactive import ProactiveEngine
 
 logger = get_logger("admin.main")
 
@@ -33,10 +34,19 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     shutdown_event = asyncio.Event()
     logger.info("admin_starting", host=settings.admin_host, port=settings.admin_port)
-    bot_task = asyncio.create_task(start_bot(shutdown_event))
+
+    bot = create_bot()
+    dp = create_dispatcher()
+    bot_task = asyncio.create_task(start_bot(shutdown_event, bot=bot, dp=dp))
     bot_task.add_done_callback(_exit_if_bot_dies)
+
+    proactive = ProactiveEngine(bot)
+    proactive.start()
+
     yield
+
     logger.info("admin_shutting_down")
+    proactive.stop()
     shutdown_event.set()
     bot_task.remove_done_callback(_exit_if_bot_dies)
     await bot_task

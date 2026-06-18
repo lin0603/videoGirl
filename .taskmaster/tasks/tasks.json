@@ -105,7 +105,7 @@
         "id": "8",
         "title": "GPU media job queue + model load/unload manager (Redis + Celery/RQ)",
         "description": "Redis-backed job queue that serializes the rented 4090's media work (images, video), prioritizes photo over video, and manages VRAM-aware load/unload between ComfyUI and the video model. LLM is NOT in this queue (it runs on the Mac mini).",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           "3",
           "6"
@@ -113,7 +113,8 @@
         "priority": "high",
         "details": "Serializes 4090 media work only. Celery or RQ on Redis. Priority lanes: photo > video (batch). VRAM manager unloads ComfyUI before loading the video model and reloads after, to fit 24GB. Worker reached over Tailscale (4090 is remote/disposable; queue must tolerate the GPU being offline and resume when it returns). Job status tracking + async delivery callback to the bot. Backpressure + retries + dead-letter.",
         "testStrategy": "Submitting a photo job loads ComfyUI and returns an image; a video job yields to photo priority; VRAM never overflows 24GB during model swaps; jobs queued while the 4090 is offline run when it reconnects; failed jobs retry then dead-letter.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T16:29:22.708Z"
       },
       {
         "id": "9",
@@ -160,7 +161,7 @@
         "id": "12",
         "title": "Proactive engine: scheduled, AI-initiated messages",
         "description": "Proactive CARE engine: routine-aware check-ins (what are you doing / eaten yet / how are you) + good-morning/night, in persona voice & current mood.",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           "6",
           "8"
@@ -168,7 +169,8 @@
         "priority": "high",
         "details": "APScheduler/Celery-beat per-user proactive jobs through the orchestrator (persona + memory + mood applied). Message types beyond good-morning/night: CARE check-ins — '你在做什麼?' '吃飯了嗎?' '今天還好嗎?' — chosen by time-of-day, user routine, and time-since-last-interaction. Respect quiet hours + frequency caps + opt-out. Can attach voice/photo via the media queue. Feeds off mood (#32) so tone matches the companion's current emotion.",
         "testStrategy": "Scheduled good-morning fires at the user's local time within quiet-hour rules; opt-out stops proactive messages; proactive text is persona-consistent and memory-aware.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T16:21:33.163Z"
       },
       {
         "id": "13",
@@ -269,7 +271,7 @@
         "id": "20",
         "title": "點數錢包 (credits)",
         "description": "Stars-funded credit wallet; media generation (photo/voice/video) debits credits atomically.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "19",
           "8",
@@ -279,7 +281,7 @@
         "details": "wallets(user_id, balance) + ledger(entry_id, user_id, delta, reason, ref) with atomic transactions. Top-up: buy credits with Stars (#19). Debit on each media job (photo/voice/video) tied to GPU cost; block + friendly prompt when insufficient. Expose balance in chat and Mini App.",
         "testStrategy": "Top-up adds credits; generating an image debits the right amount atomically; concurrent debits never go negative; insufficient balance is blocked with a prompt.",
         "subtasks": [],
-        "updatedAt": "2026-06-18T16:02:49.552Z"
+        "updatedAt": "2026-06-18T16:10:45.249Z"
       },
       {
         "id": "21",
@@ -473,9 +475,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T16:02:49.555Z",
+      "lastModified": "2026-06-18T16:29:22.709Z",
       "taskCount": 33,
-      "completedCount": 12,
+      "completedCount": 13,
       "tags": [
         "master"
       ]

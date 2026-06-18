@@ -34,6 +34,7 @@ def get_router() -> Router:
             "/voice_settings - 查看語音設定\n"
             "/voice_list - 列出可選的語音類別\n"
             "/mood - 查看女友此刻心情\n"
+            "/snooze - 暫停主動關心訊息\n"
             "/voice_set <類別> - 選擇語音類別\n"
             "/products - 查看 Stars 數位商品\n"
             "/buy <商品代碼> - 開立 Telegram Stars 發票\n"
@@ -172,5 +173,18 @@ def get_router() -> Router:
             f"此刻心情：{label_map.get(snapshot.dominant, snapshot.dominant)}\n"
             f"（{snapshot.phrase}）"
         )
+
+    @router.message(Command("snooze"))
+    async def cmd_snooze(message: types.Message, session: AsyncSession) -> None:
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None:
+            await message.answer("你還沒有完成註冊，請先使用 /start。")
+            return
+        await repo.set_proactive_opt_out(message.from_user.id, not user.proactive_opt_out)
+        if user.proactive_opt_out:
+            await message.answer("已重新開啟主動關心訊息 💌")
+        else:
+            await message.answer("已暫停主動關心訊息。想重新開啟再輸入一次 /snooze。")
 
     return router
