@@ -58,6 +58,61 @@ def get_router() -> Router:
             "或輸入 /subscribe 訂閱 VIP 月方案。"
         )
 
+    @router.message(Command("gacha"))
+    async def cmd_gacha(message: types.Message, session: AsyncSession) -> None:
+        """Spend credits for a gacha draw — random generated photo with rarity."""
+        from shared.gacha import GACHA_COST_CREDITS, execute_gacha_draw, odds_text, TIERS
+        from shared.repositories.subscription_repo import EntitlementService
+        from shared.repositories.user_repo import UserRepository
+        from shared.wallet import InsufficientCreditsError, WalletService
+
+        repo = UserRepository(session)
+        user = await repo.get_by_telegram_id(message.from_user.id)
+        if user is None or user.age_verified_at is None:
+            await message.answer("請先完成年齡驗證：/start")
+            return
+
+        # Check wallet before asking.
+        balance = await WalletService(session).get_balance(message.from_user.id)
+        if balance < GACHA_COST_CREDITS:
+            await message.answer(
+                f"點數不足！抽卡需要 {GACHA_COST_CREDITS} 點，目前只有 {balance} 點。\n"
+                "用 /topup 儲值更多點數 💳"
+            )
+            return
+
+        nsfw_allowed = await EntitlementService(session).nsfw_allowed(user)
+        nsfw = user.nsfw_opt_in and user.age_verified_at is not None and nsfw_allowed
+        persona_slug = getattr(user, "active_persona_slug", None)
+
+        try:
+            draw = await execute_gacha_draw(
+                session,
+                message.from_user.id,
+                nsfw=nsfw,
+                persona_slug=persona_slug,
+            )
+        except InsufficientCreditsError:
+            await message.answer(
+                f"點數不足！請用 /topup 儲值更多。"
+            )
+            return
+
+        tier_label = {"R": "✨ 普通", "SR": "💎 稀有", "SSR": "🌟 超稀有"}.get(draw.rarity, draw.rarity)
+        await message.answer(
+            f"抽到了！{tier_label} — {draw.scene_key}\n"
+            "圖片生成中，等一下就傳給你 🎲"
+        )
+
+    @router.message(Command("gacha_info"))
+    async def cmd_gacha_info(message: types.Message) -> None:
+        from shared.gacha import GACHA_COST_CREDITS, PITY_THRESHOLD, odds_text
+        await message.answer(
+            f"抽卡機率：\n{odds_text()}\n\n"
+            f"每次抽卡花費：{GACHA_COST_CREDITS} 點\n"
+            f"保底：每 {PITY_THRESHOLD} 抽必出 SSR"
+        )
+
     @router.message(Command("gift"))
     async def cmd_gift(message: types.Message, bot: Bot) -> None:
         """Send a virtual gift to the girlfriend via Stars payment."""

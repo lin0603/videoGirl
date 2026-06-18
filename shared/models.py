@@ -298,6 +298,25 @@ class UserRelationship(Base):
     user: Mapped["User"] = relationship("User", foreign_keys=[telegram_id])
 
 
+class GachaDraw(Base):
+    """Record of a single gacha pull (task #25)."""
+
+    __tablename__ = "gacha_draws"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE")
+    )
+    rarity: Mapped[str] = mapped_column(String(8))  # "R", "SR", "SSR"
+    scene_key: Mapped[str] = mapped_column(String(128))
+    job_id: Mapped[str | None] = mapped_column(String(256))  # ComfyUI job for async delivery
+    cost_credits: Mapped[int] = mapped_column(Integer)
+    pity_count: Mapped[int] = mapped_column(Integer, default=0)  # draws since last SSR at time of draw
+    drawn_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+
+
 class Unlock(Base):
     """Per-user record of a paid media unlock (task #22)."""
 
