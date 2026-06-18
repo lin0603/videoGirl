@@ -4,14 +4,22 @@ import os
 from pathlib import Path
 
 from aiogram import Bot
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from miniapp.security import MiniAppAuthError, MiniAppUser, validate_init_data
+from miniapp.security import (
+    MiniAppAuthError,
+    MiniAppUser,
+    _SESSION_TTL,
+    create_session_token,
+    decode_session_token,
+    validate_init_data,
+)
 from shared.config import get_settings
 from shared.db import AsyncSessionLocal
 from shared.payments import StarsPaymentService, UnknownProductError
@@ -33,9 +41,14 @@ class InitDataResponse(BaseModel):
     username: str | None = None
 
 
+class SessionResponse(BaseModel):
+    token: str
+    expires_in: int
+    user_id: int
+
+
 class InvoiceLinkRequest(BaseModel):
-    init_data: str
-    product: str
+    product: str  # session-auth; no need to re-send init_data
 
 
 class InvoiceLinkResponse(BaseModel):
@@ -48,6 +61,9 @@ class InvoiceLinkResponse(BaseModel):
 async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
         yield session
+
+
+_bearer = HTTPBearer(auto_error=False)
 
 
 def _auth(init_data: str) -> MiniAppUser:
@@ -63,6 +79,21 @@ def _auth(init_data: str) -> MiniAppUser:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
         ) from exc
+
+
+def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
+) -> int:
+    """FastAPI dependency: validates Bearer session token, returns user_id."""
+    if credentials is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing token")
+    try:
+        return decode_session_token(
+            credentials.credentials,
+            secret_key=get_settings().admin_secret_key,
+        )
+    except MiniAppAuthError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
 
 async def _ensure_user(session: AsyncSession, user: MiniAppUser) -> None:
@@ -87,19 +118,34 @@ async def validate_telegram_init_data(body: InitDataRequest) -> InitDataResponse
     return InitDataResponse(ok=True, user_id=user.id, username=user.username)
 
 
+@router.post("/api/auth/session")
+async def create_session(
+    body: InitDataRequest,
+    session: AsyncSession = Depends(get_db),
+) -> SessionResponse:
+    """
+    Exchange Telegram initData for a short-lived session token.
+    Front-end calls this once on app open, then uses the token for all subsequent requests.
+    """
+    user = _auth(body.init_data)
+    await _ensure_user(session, user)
+    settings = get_settings()
+    token = create_session_token(user.id, secret_key=settings.admin_secret_key)
+    return SessionResponse(token=token, expires_in=_SESSION_TTL, user_id=user.id)
+
+
 @router.post("/api/payments/stars/invoice-link")
 async def create_stars_invoice_link(
     body: InvoiceLinkRequest,
+    user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_db),
 ) -> InvoiceLinkResponse:
-    user = _auth(body.init_data)
-    await _ensure_user(session, user)
     service = StarsPaymentService(session)
     bot = Bot(get_settings().telegram_token)
     try:
         tx = await service.create_invoice_link(
             bot=bot,
-            user_id=user.id,
+            user_id=user_id,
             product_slug=body.product,
         )
     except UnknownProductError as exc:

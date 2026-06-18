@@ -7,9 +7,41 @@ import time
 from dataclasses import dataclass
 from urllib.parse import parse_qsl
 
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+
 
 class MiniAppAuthError(ValueError):
     pass
+
+
+# ---------------------------------------------------------------------------
+# Session tokens (short-lived, signed with itsdangerous)
+# ---------------------------------------------------------------------------
+_SESSION_TTL = 3600  # 1 hour
+_SALT = "miniapp-session"
+
+
+def _make_signer(secret_key: str) -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(secret_key, salt=_SALT)
+
+
+def create_session_token(user_id: int, *, secret_key: str) -> str:
+    """Return a signed, timed session token encoding user_id."""
+    return _make_signer(secret_key).dumps({"user_id": user_id})
+
+
+def decode_session_token(token: str, *, secret_key: str, max_age: int = _SESSION_TTL) -> int:
+    """
+    Decode and verify a session token.
+    Returns user_id. Raises MiniAppAuthError on failure.
+    """
+    try:
+        payload = _make_signer(secret_key).loads(token, max_age=max_age)
+        return int(payload["user_id"])
+    except SignatureExpired as exc:
+        raise MiniAppAuthError("session token expired") from exc
+    except (BadSignature, KeyError, TypeError, ValueError) as exc:
+        raise MiniAppAuthError("invalid session token") from exc
 
 
 @dataclass(frozen=True)
