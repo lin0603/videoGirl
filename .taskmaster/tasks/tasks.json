@@ -17,7 +17,7 @@
         "id": "2",
         "title": "Telegram bot foundation (aiogram 3.x): commands, age gate, NSFW opt-in",
         "description": "Async aiogram bot with command handlers, onboarding FSM, 18+ age gate, adult NSFW opt-in toggle, user profile persistence, and Redis-backed rate limiting.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "1"
         ],
@@ -25,7 +25,7 @@
         "details": "aiogram 3.x with FSM, using **long polling** (no webhook / public HTTPS needed — host is behind home NAT). /start -> onboarding if new user. Age gate (birth-year input, age>=18) stores age_verified_at. NSFW opt-in inline keyboard, default SFW. Commands: /start /help /reset /settings /toggle_nsfw. users table: telegram_id PK, username, display_name, age_verified_at, nsfw_opt_in, locale default 'zh-TW', created_at. Per-user sliding-window rate limit in Redis. Audit log of age verification.",
         "testStrategy": "aiogram mocked dispatcher unit tests for FSM transitions; age gate rejects <18 and accepts valid; /toggle_nsfw flips flag; integration run of full onboarding writes correct DB state.",
         "subtasks": [],
-        "updatedAt": "2026-06-18T04:05:02.746Z"
+        "updatedAt": "2026-06-18T04:15:37.829Z"
       },
       {
         "id": "3",
@@ -59,7 +59,7 @@
         "id": "5",
         "title": "Memory system: conversation history + pgvector long-term memory",
         "description": "Conversation history + pgvector long-term memory PLUS an explicit structured user dossier (personality traits, preferences, life facts) for reliable recall.",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           "1",
           "4"
@@ -67,7 +67,8 @@
         "priority": "high",
         "details": "conversation_turns table (user_id, role, content, tokens_estimate, created_at) retrieved by token budget. memories table with embedding VECTOR + ivfflat cosine index, memory_type, importance_score (embeddings via bge-m3/nomic on Coolify CPU). ENHANCED — build an explicit USER DOSSIER: each turn the LLM extracts structured {facts, preferences, personality_traits, speech_quirks, life_facts(birthday, job, routine, recurring bills due-dates)} -> upsert. Store traits/preferences in a queryable user_profile table (not only as vectors) so persona can reliably 'remember your personality'. Before each reply: semantic top-K retrieve + inject the dossier summary into the prompt. user_relationships: intimacy_level, affection_score, streak_days, special_dates JSONB.",
         "testStrategy": "Insert/retrieve roundtrip returns semantically relevant memories; sliding window respects token budget; relationship counters update across turns; recall persists across sessions.",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-06-18T04:18:17.959Z"
       },
       {
         "id": "6",
@@ -462,9 +463,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T04:07:47.105Z",
+      "lastModified": "2026-06-18T04:18:17.959Z",
       "taskCount": 33,
-      "completedCount": 3,
+      "completedCount": 4,
       "tags": [
         "master"
       ]

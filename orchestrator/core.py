@@ -1,14 +1,22 @@
-"""Orchestrator core (task #6, lite).
+"""Orchestrator core (tasks #6 + #5 wiring).
 
-Wires persona + (later) memory + history into the switchable LLM client and
-returns a reply string. Telegram I/O (task #2) and memory (task #5) plug in
-around this.
+`generate_reply` stays a pure persona+LLM function. `respond` adds the memory
+layer (history + dossier/recall + background extraction) and is what the
+Telegram bot (#2) calls.
 """
 
 from __future__ import annotations
 
+import asyncio
+
 from shared.llm import LLMError, get_llm_client
 from shared.logging import get_logger
+from shared.memory import (
+    build_memory_context,
+    extract_and_store,
+    get_recent_history,
+    save_turn,
+)
 
 from orchestrator.persona import Persona, build_system_prompt, get_persona
 
@@ -47,34 +55,64 @@ async def generate_reply(
         return FALLBACK_REPLY
 
 
-async def _demo() -> None:
-    import sys
+async def respond(
+    uid: int, user_text: str, persona: Persona, *, nsfw: bool = False
+) -> str:
+    """Full memory-aware turn: recall -> reply -> persist -> background-extract."""
+    history = await get_recent_history(uid)
+    memory = await build_memory_context(uid, user_text)
+    reply = await generate_reply(
+        persona, user_text, nsfw=nsfw, history=history, memory=memory
+    )
+    await save_turn(uid, "user", user_text)
+    await save_turn(uid, "assistant", reply)
+    snippet = f"使用者:{user_text}\n女友:{reply}"
+    asyncio.create_task(extract_and_store(uid, snippet))  # don't block the reply
+    return reply
 
+
+async def _demo(use_memory: bool, nsfw: bool) -> None:
     persona = get_persona()
-    nsfw = "--nsfw" in sys.argv
-    print(f"與「{persona.name}」對話中(輸入 exit 離開)。nsfw={nsfw}\n")
-    history: list[Message] = []
-    loop = __import__("asyncio").get_event_loop()
-    while True:
-        try:
-            user_text = await loop.run_in_executor(None, input, "你> ")
-        except (EOFError, KeyboardInterrupt):
-            break
-        if user_text.strip() in {"exit", "quit"}:
-            break
-        reply = await generate_reply(
-            persona, user_text, nsfw=nsfw, history=history[-8:]
+    uid = 999999  # demo user
+    if use_memory:
+        from shared.db import db
+
+        await db.connect()
+        await db.execute(
+            "INSERT INTO users (telegram_id, display_name, nsfw_opt_in) "
+            "VALUES ($1,'demo',$2) ON CONFLICT (telegram_id) DO NOTHING",
+            uid,
+            nsfw,
         )
-        print(f"{persona.name}> {reply}\n")
-        history.append({"role": "user", "content": user_text})
-        history.append({"role": "assistant", "content": reply})
+    print(f"與「{persona.name}」對話中(exit 離開)。memory={use_memory} nsfw={nsfw}\n")
+    history: list[Message] = []
+    loop = asyncio.get_event_loop()
+    try:
+        while True:
+            user_text = await loop.run_in_executor(None, input, "你> ")
+            if user_text.strip() in {"exit", "quit"}:
+                break
+            if use_memory:
+                reply = await respond(uid, user_text, persona, nsfw=nsfw)
+            else:
+                reply = await generate_reply(
+                    persona, user_text, nsfw=nsfw, history=history[-8:]
+                )
+                history += [
+                    {"role": "user", "content": user_text},
+                    {"role": "assistant", "content": reply},
+                ]
+            print(f"{persona.name}> {reply}\n")
+    except (EOFError, KeyboardInterrupt):
+        pass
 
 
-if __name__ == "__main__":  # python -m orchestrator.core --demo [--nsfw]
-    import asyncio
+if __name__ == "__main__":  # python -m orchestrator.core --demo [--nsfw] [--no-memory]
     import sys
 
     if "--demo" in sys.argv:
-        asyncio.run(_demo())
+        asyncio.run(
+            _demo(use_memory="--no-memory" not in sys.argv, nsfw="--nsfw" in sys.argv)
+        )
     else:
-        print("usage: python -m orchestrator.core --demo [--nsfw]")
+        print("usage: python -m orchestrator.core --demo [--nsfw] [--no-memory]")
