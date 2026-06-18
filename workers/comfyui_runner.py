@@ -41,6 +41,23 @@ def apply_params(workflow: dict, params: dict[str, object]) -> dict:
     return wf
 
 
+def upload_image(base_url: str, image_bytes: bytes, filename: str = "source.jpg") -> str:
+    """
+    Upload an image to ComfyUI's input directory via POST /upload/image.
+    Returns the filename ComfyUI assigned (use as the LoadImage node's 'image' param).
+    """
+    resp = httpx.post(
+        f"{base_url}/upload/image",
+        files={"image": (filename, image_bytes, "image/jpeg")},
+        data={"type": "input", "overwrite": "true"},
+        timeout=60,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    name = data.get("name") or data.get("filename") or filename
+    return name
+
+
 def submit_prompt(base_url: str, workflow: dict, client_id: str) -> str:
     resp = httpx.post(
         f"{base_url}/prompt",

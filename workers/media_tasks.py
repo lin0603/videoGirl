@@ -16,6 +16,7 @@ from workers.comfyui_runner import (
     download_output,
     load_workflow,
     submit_prompt,
+    upload_image,
     wait_for_completion,
 )
 
@@ -50,7 +51,22 @@ def execute_job(
     try:
         workflow_path = f"infra/comfyui/workflows/{job_data['workflow']}"
         workflow = load_workflow(workflow_path)
-        workflow = apply_params(workflow, job_data.get("params") or {})
+        params = dict(job_data.get("params") or {})
+
+        # I2V jobs may include a source image URL that must be uploaded first.
+        source_image_url = params.pop("_source_image_url", None)
+        source_image_node = params.pop("_source_image_node", "97")
+        if source_image_url:
+            img_resp = httpx.get(source_image_url, timeout=30)
+            img_resp.raise_for_status()
+            uploaded_name = upload_image(
+                comfyui_base_url,
+                img_resp.content,
+                filename=f"src_{job_id}.jpg",
+            )
+            params[f"{source_image_node}.image"] = uploaded_name
+
+        workflow = apply_params(workflow, params)
 
         client_id = str(uuid.uuid4())
         prompt_id = submit_prompt(comfyui_base_url, workflow, client_id)

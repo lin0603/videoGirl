@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from orchestrator.core import respond
 from orchestrator.persona import get_persona
 from shared.image_gen import is_photo_request, request_photo
+from shared.video_gen import is_video_request, request_video
 from shared.logging import get_logger
 from shared.mood import MoodService, format_mood_for_prompt
 from shared.safety import check_prompt, refusal_message
@@ -78,6 +79,27 @@ def get_router() -> Router:
                 await message.answer("好的，稍等一下，我去拍一張給你 📸")
             else:
                 logger.debug("photo_request_skipped_no_callback", telegram_id=message.from_user.id)
+
+        # Detect video-request intent (lower priority queue, fire-and-forget).
+        if is_video_request(message.text):
+            # Video needs a source image — use a placeholder URL until we have
+            # a recent photo for the user. The feature degrades gracefully if
+            # no source_image_url is available.
+            source_url = getattr(user, "last_generated_image_url", None) or ""
+            if source_url:
+                video_job_id = await request_video(
+                    message.from_user.id,
+                    source_image_url=source_url,
+                    nsfw=nsfw,
+                )
+                if video_job_id:
+                    await message.answer("好，幫你生成一段小影片，需要幾分鐘，等我一下 🎬")
+            else:
+                # No source image yet: generate a photo first, note the gap silently.
+                logger.debug(
+                    "video_request_no_source_image",
+                    telegram_id=message.from_user.id,
+                )
 
         if user.voice_enabled:
             try:
