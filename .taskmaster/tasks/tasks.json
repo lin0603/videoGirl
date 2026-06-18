@@ -1,0 +1,255 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": "1",
+        "title": "Project scaffolding + infra (Coolify-deployable: Postgres+pgvector, Redis)",
+        "description": "Initialize the monorepo structure, Python 3.11+ asyncio environment, pydantic-settings config, structured logging, and a Coolify-deployable layout (Nixpacks/Dockerfile) with PostgreSQL (pgvector) and Redis as Coolify services.",
+        "status": "in-progress",
+        "dependencies": [],
+        "priority": "high",
+        "details": "Create package layout: bot/, orchestrator/, workers/, shared/, infra/. Target deploy = self-hosted Coolify on a home Linux box (Docker runtime managed by Coolify, not hand-written compose). Provide a Nixpacks-friendly app + optional Dockerfile; Postgres (pgvector) and Redis provisioned as Coolify one-click services. Postgres init: CREATE EXTENSION vector. Provide a local docker-compose ONLY for dev convenience (optional). Config via pydantic-settings (telegram_token, postgres_url, redis_url, ollama_base_url [Mac mini LAN IP], comfyui_base_url [4090 via Tailscale], breezyvoice_base_url, embedding_model, log_level, model_name). Structured JSON logging via structlog. Keep .env (gitignored) as the single secrets source; document Coolify env vars.",
+        "testStrategy": "App builds under Nixpacks/Dockerfile; deploys on Coolify with Postgres+Redis services healthy; pytest connectivity test connects to Postgres with pgvector enabled and pings Redis; settings load fails loudly on missing required fields.",
+        "subtasks": [],
+        "updatedAt": "2026-06-18T02:25:03.076Z"
+      },
+      {
+        "id": "2",
+        "title": "Telegram bot foundation (aiogram 3.x): commands, age gate, NSFW opt-in",
+        "description": "Async aiogram bot with command handlers, onboarding FSM, 18+ age gate, adult NSFW opt-in toggle, user profile persistence, and Redis-backed rate limiting.",
+        "status": "pending",
+        "dependencies": [
+          "1"
+        ],
+        "priority": "high",
+        "details": "aiogram 3.x with FSM, using **long polling** (no webhook / public HTTPS needed — host is behind home NAT). /start -> onboarding if new user. Age gate (birth-year input, age>=18) stores age_verified_at. NSFW opt-in inline keyboard, default SFW. Commands: /start /help /reset /settings /toggle_nsfw. users table: telegram_id PK, username, display_name, age_verified_at, nsfw_opt_in, locale default 'zh-TW', created_at. Per-user sliding-window rate limit in Redis. Audit log of age verification.",
+        "testStrategy": "aiogram mocked dispatcher unit tests for FSM transitions; age gate rejects <18 and accepts valid; /toggle_nsfw flips flag; integration run of full onboarding writes correct DB state.",
+        "subtasks": []
+      },
+      {
+        "id": "3",
+        "title": "LLM serving on Mac mini (Ollama, uncensored zh-TW model) + async wrapper",
+        "description": "Deploy Ollama on the always-on Mac mini M4 (16GB) with a 4-bit uncensored Traditional-Chinese model, reachable over the home LAN, plus an async Python client with retries and timeouts.",
+        "status": "pending",
+        "dependencies": [
+          "1"
+        ],
+        "priority": "high",
+        "details": "Run on the Mac mini (16GB, ~10.6GB GPU budget), headless/dedicated. PRIMARY model = **HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive, Q6_K (~7.4GB)** via `ollama run hf.co/HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive:Q6_K` (use Q4_K_M ~5.6GB for more speed/headroom; skip the mmproj vision file — text only). Dense 9B, Qwen base = strong Chinese. LESSON: do NOT run MoE models like Qwen3.6-35B-A3B on the 16GB Mac — MoE needs ALL experts resident (~18-20GB at Q4) so it swaps and crashes; the 35B-A3B is a FUTURE option only on a dedicated >=24GB GPU (the 4090 dedicated to LLM + a separate GPU for media), not the Mac. Consider MLX if RAM-tight. Verify zh-TW (Traditional, not Simplified) quality + NSFW compliance on a test persona. Expose Ollama on the LAN; orchestrator connects via ollama_base_url (Mac LAN IP). httpx.AsyncClient wrapper over /api/chat with retries/timeouts. Embeddings do NOT run here — they run on the Coolify Linux CPU (see task 5). Track TTFT + latency. Low concurrency (single instance); scale-out path = move LLM to a dedicated GPU.",
+        "testStrategy": "Orchestrator reaches Ollama over LAN; 50 zh-TW sample prompts produce Traditional Chinese with no unwanted refusals; memory stays within budget for chosen model+context; p99 latency target documented for single-user chat.",
+        "subtasks": []
+      },
+      {
+        "id": "4",
+        "title": "Persona system + dynamic prompt builder",
+        "description": "Configurable girlfriend personas (personality, speaking style, backstory, boundaries, nsfw_level) with a Jinja2-based system-prompt builder.",
+        "status": "pending",
+        "dependencies": [
+          "3"
+        ],
+        "priority": "high",
+        "details": "personas table: slug, name, personality, speaking_style, backstory, boundaries[], nsfw_level (0/1/2), default_voice_seed, system_prompt_template (Jinja2), active. build_system_prompt(persona, memory_context, nsfw_enabled, current_time TW tz). NSFW-on vs SFW branches in template. Support multiple selectable personas + per-user current persona.",
+        "testStrategy": "Unit tests render prompt with/without memory and NSFW flag; switching persona changes response style; opencc check confirms Traditional Chinese output.",
+        "subtasks": []
+      },
+      {
+        "id": "5",
+        "title": "Memory system: conversation history + pgvector long-term memory",
+        "description": "Sliding-window conversation history, pgvector semantic memory for facts/preferences/relationship state, salient-fact extraction, and retrieval for prompt injection.",
+        "status": "pending",
+        "dependencies": [
+          "1",
+          "4"
+        ],
+        "priority": "high",
+        "details": "conversation_turns table (user_id, role, content, tokens_estimate, created_at) retrieved by token budget. memories table with embedding VECTOR + ivfflat cosine index, memory_type, importance_score. Embeddings via bge-m3 / nomic-embed (Ollama). After each turn: LLM extracts facts/relationship updates -> embed + upsert. Before each reply: embed query -> top-K retrieve -> format into prompt. user_relationships: intimacy_level, affection_score, streak_days, special_dates JSONB.",
+        "testStrategy": "Insert/retrieve roundtrip returns semantically relevant memories; sliding window respects token budget; relationship counters update across turns; recall persists across sessions.",
+        "subtasks": []
+      },
+      {
+        "id": "6",
+        "title": "Orchestrator v1: persona + memory + history -> LLM -> reply",
+        "description": "Core dialog loop wiring persona, retrieved memory, and history into the LLM call and back to Telegram, with per-user rate limiting and graceful fallbacks.",
+        "status": "pending",
+        "dependencies": [
+          "2",
+          "4",
+          "5"
+        ],
+        "priority": "high",
+        "details": "On inbound message: load user+persona, retrieve memory, build prompt, call LLM, persist turns, send reply. Handle NSFW gating (block if not opted in). Error handling: timeouts, LLM unavailable -> friendly fallback text. Concurrency-safe per user. This is the end-to-end MVP slice (text chat + memory + persona).",
+        "testStrategy": "End-to-end: a real Telegram message yields a persona-consistent zh-TW reply using recalled memory; NSFW blocked for non-opted users; LLM failure degrades to a graceful message, not a crash.",
+        "subtasks": []
+      },
+      {
+        "id": "7",
+        "title": "Admin + observability for MVP",
+        "description": "Minimal admin tooling to view users/conversations, switch a user's persona, and basic metrics/log dashboards.",
+        "status": "pending",
+        "dependencies": [
+          "6"
+        ],
+        "priority": "medium",
+        "details": "Admin API or CLI: list users, view recent conversation, set persona, toggle NSFW. Metrics: message volume, LLM latency, error rate, queue depth (later). Structured logs queryable. Keep it lightweight for a single operator.",
+        "testStrategy": "Admin can list users and switch a persona that takes effect on next reply; metrics endpoints return live counters; logs are structured JSON.",
+        "subtasks": []
+      },
+      {
+        "id": "8",
+        "title": "GPU media job queue + model load/unload manager (Redis + Celery/RQ)",
+        "description": "Redis-backed job queue that serializes the rented 4090's media work (images, video), prioritizes photo over video, and manages VRAM-aware load/unload between ComfyUI and the video model. LLM is NOT in this queue (it runs on the Mac mini).",
+        "status": "pending",
+        "dependencies": [
+          "3",
+          "6"
+        ],
+        "priority": "high",
+        "details": "Serializes 4090 media work only. Celery or RQ on Redis. Priority lanes: photo > video (batch). VRAM manager unloads ComfyUI before loading the video model and reloads after, to fit 24GB. Worker reached over Tailscale (4090 is remote/disposable; queue must tolerate the GPU being offline and resume when it returns). Job status tracking + async delivery callback to the bot. Backpressure + retries + dead-letter.",
+        "testStrategy": "Submitting a photo job loads ComfyUI and returns an image; a video job yields to photo priority; VRAM never overflows 24GB during model swaps; jobs queued while the 4090 is offline run when it reconnects; failed jobs retry then dead-letter.",
+        "subtasks": []
+      },
+      {
+        "id": "9",
+        "title": "BreezyVoice TTS service: zh-TW voice messages",
+        "description": "Deploy BreezyVoice on the 4090, generate zh-TW voice for the persona, encode to Telegram voice (.ogg/opus), and let the orchestrator decide when to reply with voice.",
+        "status": "pending",
+        "dependencies": [
+          "8"
+        ],
+        "priority": "medium",
+        "details": "BreezyVoice (CosyVoice-based) service with per-persona reference voice (default_voice_seed). text -> wav -> ogg/opus for Telegram sendVoice. Orchestrator policy for when to send voice vs text. Run as a queue worker (light GPU footprint). Cache repeated phrases.",
+        "testStrategy": "Generated voice plays natively as a Telegram voice message; zh-TW pronunciation is correct; persona voice is consistent; latency acceptable under the queue.",
+        "subtasks": []
+      },
+      {
+        "id": "10",
+        "title": "ComfyUI image pipeline: on-demand NSFW photos",
+        "description": "Deploy ComfyUI on the 4090 with an NSFW-capable checkpoint and prompt templates; generate context-triggered selfies/photos and deliver to Telegram.",
+        "status": "pending",
+        "dependencies": [
+          "8"
+        ],
+        "priority": "medium",
+        "details": "ComfyUI API workflows. Choose NSFW checkpoint (SDXL/Pony/Illustrious). Prompt templates for selfie/scene with SFW vs NSFW branches gated by user opt-in. Orchestrator detects photo-request intent or proactively offers. Queue as photo-priority job; deliver via sendPhoto.",
+        "testStrategy": "A chat photo request produces a relevant image delivered to Telegram; NSFW images only for opted-in users; generation runs through the GPU queue without VRAM conflict with the LLM.",
+        "subtasks": []
+      },
+      {
+        "id": "11",
+        "title": "Character consistency for photos (per-persona LoRA / IPAdapter)",
+        "description": "Make each girlfriend look the same across photos via per-persona LoRA training (or IPAdapter/InstantID + reference face) with fixed style/seed controls.",
+        "status": "pending",
+        "dependencies": [
+          "10"
+        ],
+        "priority": "medium",
+        "details": "Pipeline to train/prepare a per-persona LoRA, or IPAdapter/InstantID with a reference face on a fixed checkpoint. Locked style/seed conventions, pose/scene template library (NSFW + SFW). Store persona->LoRA/reference mapping. This is the hardest visual-quality task and the real differentiator for believable photos.",
+        "testStrategy": "Multiple generations of the same persona are recognizably the same character (face/style); switching persona switches identity; NSFW and SFW templates both stay on-model.",
+        "subtasks": []
+      },
+      {
+        "id": "12",
+        "title": "Proactive engine: scheduled, AI-initiated messages",
+        "description": "APScheduler-based engine that proactively messages users (good-morning/night, missing-you, event-based) with per-user quiet hours and opt-in/out.",
+        "status": "pending",
+        "dependencies": [
+          "6",
+          "8"
+        ],
+        "priority": "high",
+        "details": "This is the key competitive differentiator (assistant-hybrid). APScheduler (or Celery beat) jobs per user. Message types: daily check-ins, time-based, relationship-event-based. Quiet hours + frequency caps + opt-out. Generated through the orchestrator so persona/memory apply. Can attach voice/photo via the queue.",
+        "testStrategy": "Scheduled good-morning fires at the user's local time within quiet-hour rules; opt-out stops proactive messages; proactive text is persona-consistent and memory-aware.",
+        "subtasks": []
+      },
+      {
+        "id": "13",
+        "title": "Reminders & notes (natural language)",
+        "description": "Let users create reminders and notes in natural language and have the persona deliver/recall them via the proactive engine.",
+        "status": "pending",
+        "dependencies": [
+          "12"
+        ],
+        "priority": "medium",
+        "details": "Parse '提醒我...' / note intents from chat (LLM structured extraction). reminders + notes tables (content, due_at, recurrence, status). Scheduled delivery through the proactive engine in persona voice. Recall/query notes on request. Edit/cancel flows.",
+        "testStrategy": "A NL reminder schedules and fires at the right time in persona voice; recurring reminders repeat; notes are stored and recalled accurately; cancel works.",
+        "subtasks": []
+      },
+      {
+        "id": "14",
+        "title": "Image-to-video worker (Wan2.2 / Hunyuan) on 4090",
+        "description": "Deploy an image-to-video model on the 4090 as a low-priority, long-running batch worker integrated into the GPU queue.",
+        "status": "pending",
+        "dependencies": [
+          "8",
+          "11"
+        ],
+        "priority": "medium",
+        "details": "Wan2.2 i2v or HunyuanVideo. Heavy VRAM + minutes per clip -> lowest queue priority, runs when GPU otherwise idle, requires LLM unload. Integrate with the model load/unload manager. Output short clips encoded for Telegram.",
+        "testStrategy": "i2v produces a short clip from a character-consistent source image; the job yields the GPU to interactive chat appropriately; VRAM stays within 24GB during the swap.",
+        "subtasks": []
+      },
+      {
+        "id": "15",
+        "title": "Video generation flow + delivery",
+        "description": "End-to-end short-video flow: pick/generate a character-consistent source image -> i2v -> encode -> deliver as a Telegram video with progress feedback.",
+        "status": "pending",
+        "dependencies": [
+          "14"
+        ],
+        "priority": "medium",
+        "details": "Orchestrator path for video requests: source image (reuse persona LoRA/reference) -> enqueue i2v -> encode mp4 -> sendVideo. Since rendering takes minutes, send 'generating...' feedback and deliver asynchronously when done. Respect file-size limits.",
+        "testStrategy": "A video request returns progress feedback then delivers a playable Telegram video of the correct persona; async delivery survives bot restart (job persisted).",
+        "subtasks": []
+      },
+      {
+        "id": "16",
+        "title": "Media cost/throughput controls",
+        "description": "Per-user quotas and queue backpressure for photo/voice/video to protect the single GPU and control cost.",
+        "status": "pending",
+        "dependencies": [
+          "15"
+        ],
+        "priority": "medium",
+        "details": "Per-user daily quotas for photo/voice/video; max concurrent video jobs; queue depth limits with user-facing 'busy, please wait' messaging; log any silent drops. Configurable per tier (free vs paid later).",
+        "testStrategy": "Exceeding quota returns a friendly limit message; queue backpressure prevents GPU overload; metrics show per-user usage; no silent job loss.",
+        "subtasks": []
+      },
+      {
+        "id": "17",
+        "title": "Safety & content policy (cross-cutting)",
+        "description": "Enforce adult-only access and refuse illegal content; content filters on LLM output and image/video generation.",
+        "status": "pending",
+        "dependencies": [
+          "6",
+          "10"
+        ],
+        "priority": "high",
+        "details": "Hard age gate enforcement; CSAM and other illegal-content refusal on both text and image/video prompts/outputs; prompt + output filters; block-list for generation; SFW default with explicit opt-in separation. Audit logging. Applies across chat, photo, video.",
+        "testStrategy": "Illegal-content prompts are refused on text and image paths; non-opted users never receive NSFW; age gate cannot be bypassed; filters logged for audit.",
+        "subtasks": []
+      },
+      {
+        "id": "18",
+        "title": "Facebook auto-posting (deferred / research-gated)",
+        "description": "Validate Meta policy and ban risk, then build a compose->approve->publish flow to a Facebook Page (Graph API or Post Bridge MCP).",
+        "status": "pending",
+        "dependencies": [
+          "13"
+        ],
+        "priority": "low",
+        "details": "Phase 4, gated on research: confirm Meta Graph API policy + account-suspension risk for automated AI posting (personal vs Page); decide build vs Post Bridge MCP. Flow: persona composes post (text + optional image) -> manual approval gate -> publish to Page -> rate limits + content filtering. Do NOT ship without the policy review.",
+        "testStrategy": "Policy review documented before build; a composed post requires manual approval before publishing; rate limits enforced; publishing to a test Page succeeds; suspension safeguards in place.",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "version": "1.0.0",
+      "lastModified": "2026-06-18T02:25:03.076Z",
+      "taskCount": 18,
+      "completedCount": 0,
+      "tags": [
+        "master"
+      ]
+    }
+  }
+}

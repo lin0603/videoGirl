@@ -1,0 +1,88 @@
+# PRD — AI 女友 (Telegram, 中文 NSFW)
+
+## 1. Overview / 產品概述
+A Telegram-based AI girlfriend service for a Traditional-Chinese (zh-TW) audience, allowing NSFW (opt-in, adult-only) romantic chat. The companion has a persistent persona and long-term memory, proactively messages the user (good-morning/night, reminders, notes), and sends multimodal content: AI-generated character-consistent photos, AI voice messages (BreezyVoice), and short videos (image-to-video). All heavy generation runs on a single rented RTX 4090 (24GB), time-shared between the LLM, image, video, and voice workloads via a GPU job queue with model load/unload management. Telegram is the primary channel because it sidesteps App Store / Google Play NSFW bans.
+
+Differentiator vs. existing AI girlfriend products: combine romantic companionship with proactive push + reminders/notes (assistant-hybrid). Facebook auto-posting is deferred to a later phase due to Meta policy / ban risk.
+
+## 2. Goals
+- Ship a working Telegram MVP: NSFW zh-TW chat with persona + long-term memory.
+- Add voice (BreezyVoice), character-consistent NSFW photos, and proactive push/reminders/notes.
+- Add short image-to-video clips.
+- Keep all generation on one 4090 via a prioritized GPU queue; interactive chat takes priority over batch media jobs.
+- Adult-only: enforce age gating and an opt-in NSFW toggle.
+
+## 3. Non-Goals (for now)
+- Facebook / social auto-posting (deferred to Phase 4; depends on validating Meta policy & ban risk).
+- iOS / Android native apps (Telegram-first to avoid store NSFW bans).
+- Multi-tenant SaaS / billing system (single-operator MVP first; payments later).
+- Real-time voice/video calls.
+
+## 4. Users & Constraints
+- Audience: zh-TW (Traditional Chinese) adult users on Telegram.
+- Deployment topology (distributed, home-hosted):
+  - App tier on a self-hosted **Coolify** instance (home Linux box): bot, orchestrator, scheduler, queue worker, PostgreSQL+pgvector, Redis, and CPU embeddings. Coolify deploys via Nixpacks/Dockerfile (Docker is the runtime but is managed by Coolify, not hand-written compose).
+  - **LLM on a Mac mini M4 (16GB, headless, same LAN)** via Ollama — persistent, always-on chat model; reached by internal LAN IP.
+  - **Media on the rented RTX 4090 (disposable)** via Tailscale — ComfyUI images + image-to-video, started on demand only.
+- Mac mini 16GB constraint: GPU budget ~10.6GB. Primary model = HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive (dense 9B, Q6_K ~7.4GB) — Qwen base = strong Chinese, fits comfortably. Do NOT run MoE models (e.g. Qwen3.6-35B-A3B) on the Mac: MoE needs ALL experts resident (~18-20GB) → swaps/crashes on 16GB. The 35B-A3B is a future option only on a dedicated >=24GB GPU, not the Mac. Keep embeddings OFF the Mac (Coolify CPU). Low concurrency; scale by moving the LLM to a dedicated GPU later.
+- Voice: BreezyVoice (MediaTek Research zero-shot TTS, strong Traditional-Chinese / Taiwanese Mandarin) — on the 4090, or on the Mac if light enough.
+- Telegram: use **long polling** (no public webhook / inbound HTTPS needed) since hosting is behind home NAT.
+- Legal: adult content opt-in only; age gate; respect Telegram ToS. Home-hosted avoids VPS adult-content AUP risk.
+
+## 5. Architecture
+- Bot Service: async Telegram bot (Python, aiogram or python-telegram-bot). Handles updates, age gate / NSFW opt-in, sends text/voice(.ogg opus)/photo/video; respects Bot API file-size limits.
+- Orchestrator: core dialog logic — load persona + retrieve memory -> build prompt -> call LLM -> decide modality (text/voice/photo/video) -> enqueue media jobs -> deliver results.
+- LLM Inference: Ollama serving an uncensored zh model (e.g. Qwen2.5-8B/14B abliterated / roleplay finetune), 4-bit, on the Mac mini (always resident). No GPU model swap against the LLM anymore — the LLM lives on a separate machine from the media GPU.
+- Memory: Postgres for users/persona/conversation history/reminders/notes/media metadata; pgvector for long-term semantic memory. Embeddings computed on the Coolify Linux CPU (keep RAM off the Mac).
+- GPU Job Queue: Redis-backed queue (Celery or RQ) that serializes **4090 media work only** (images, video), prioritizes photo > video, and manages model load/unload to fit 24GB. The LLM is no longer in this queue.
+- Media Workers on 4090: ComfyUI (SDXL/Pony/Illustrious + per-character LoRA / IPAdapter / InstantID for character consistency) for images; image-to-video (Wan2.2 i2v or Hunyuan) for clips; BreezyVoice TTS service for voice.
+- Scheduler: APScheduler / Celery beat for proactive messages, reminders, notes, daily check-ins.
+- Storage: generated media on local disk / object storage, delivered to Telegram by file_id or upload.
+- Config & Secrets: .env; per-persona config; logging & basic observability.
+
+## 6. Phased Scope
+
+### Phase 1 — MVP: Core Chat (text + memory + persona)
+- Project scaffolding: repo structure, Python env, Postgres + Redis via docker-compose, config/secrets loading, logging.
+- Telegram bot skeleton: receive/send text, command handlers (/start, /help, /reset), age gate + adult opt-in flow, user onboarding & registration.
+- LLM serving: stand up Ollama/vLLM on the 4090 with an uncensored zh-TW capable model; prompt-completion API wrapper with timeouts/retries.
+- Persona system: persona definition (name, personality, speaking style, backstory, boundaries), system-prompt builder, multiple selectable personas.
+- Memory: conversation history store; sliding-window context; long-term memory via pgvector (write salient facts, retrieve relevant memories into the prompt); relationship/affinity state.
+- Orchestrator v1: glue persona + memory + history -> LLM -> reply; per-user rate limiting; error handling & graceful fallbacks.
+- Basic admin: view users/conversations, set/switch persona.
+
+### Phase 2 — Voice + Photos + Proactive
+- BreezyVoice TTS service: deploy on 4090, zh-TW voice cloning for the persona, text->.ogg(opus); orchestrator decides when to reply with voice; deliver as Telegram voice messages.
+- ComfyUI image pipeline: deploy ComfyUI; choose NSFW-capable checkpoint (SDXL/Pony/Illustrious); build prompt templates; on-demand selfie/photo generation triggered by chat context.
+- Character consistency: per-persona LoRA training pipeline (or IPAdapter/InstantID + reference) so the girlfriend looks the same across photos; fixed seed/style controls; NSFW vs SFW pose/scene templates.
+- GPU job queue + model load/unload manager: Redis queue, priority (chat > photo), VRAM-aware model swap between LLM and ComfyUI/BreezyVoice; job status + async delivery to Telegram.
+- Proactive engine: scheduler for good-morning/night, "missing you" messages, time-based and event-based; per-user quiet hours; opt-in/opt-out.
+- Reminders & notes: natural-language reminder creation ("提醒我..."), note-taking/recall, scheduled delivery via the proactive engine; storage + query.
+
+### Phase 3 — Short Video
+- Image-to-video worker (Wan2.2 i2v / Hunyuan) on the 4090; integrate into the GPU queue as a low-priority long-running batch job.
+- Video generation flow: pick/generate a source image (character-consistent) -> i2v -> encode -> deliver as Telegram video; progress feedback to user while rendering.
+- Cost/throughput controls: per-user video quota, queue backpressure, max concurrent video jobs.
+
+### Phase 4 — Facebook Auto-Posting (deferred / research-gated)
+- Validate Meta Graph API policy and ban risk for automated AI-generated posts (personal vs Page); decide build-vs-Post-Bridge (MCP).
+- Posting flow: persona composes a post (text + optional image) -> schedule -> publish to a Facebook Page; review/approval step; rate limits.
+- Risk controls: content policy filtering, manual approval gate, account-suspension safeguards.
+
+## 7. Cross-Cutting Requirements
+- Adult-only enforcement: age gate at onboarding, NSFW opt-in toggle, content separation (SFW default).
+- Safety: refuse illegal content (CSAM etc.); content filters on both LLM output and image/video generation.
+- Reliability: GPU job retries, timeouts, dead-letter handling; graceful degradation (e.g. fall back to text if media generation fails).
+- Observability: structured logging, job metrics, queue depth, generation latency.
+- Cost controls: per-user quotas for photo/video/voice; queue limits.
+
+## 8. Tech Stack
+- Language/runtime: Python 3.11+, asyncio.
+- Telegram: aiogram (or python-telegram-bot).
+- Datastores: PostgreSQL + pgvector; Redis.
+- Queue: Celery or RQ on Redis.
+- LLM: Ollama / vLLM (uncensored zh model).
+- Image: ComfyUI (SDXL/Pony/Illustrious + LoRA/IPAdapter/InstantID).
+- Video: Wan2.2 / HunyuanVideo (image-to-video).
+- Voice: BreezyVoice (CosyVoice-based).
+- Infra: docker-compose for local services; the 4090 host runs the GPU workers.
