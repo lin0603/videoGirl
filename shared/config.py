@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     openai_compat_model: str = ""
     vllm_base_url: str = ""
 
+    # --- TTS (BreezyVoice, see shared/tts.py) ---
+    tts_timeout_secs: int = 240
+    tts_poll_secs: float = 4.0
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
