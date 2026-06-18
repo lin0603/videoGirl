@@ -12,6 +12,10 @@ services:
       # by Coolify or passed with `docker compose --env-file .env up -d`.
       postgres_url: postgresql://videogirl:${POSTGRES_PASSWORD:-videogirl}@postgres:5432/videogirl
       redis_url: redis://redis:6379/0
+      breezyvoice_base_url: ${breezyvoice_base_url:-}
+      BREEZYVOICE_URL: ${BREEZYVOICE_URL:-}
+      breezyvoice_token: ${breezyvoice_token:-}
+      BREEZYVOICE_TOKEN: ${BREEZYVOICE_TOKEN:-}
     depends_on:
       - postgres
       - redis

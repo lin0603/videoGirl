@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,6 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        env_ignore_empty=True,
         extra="ignore",
     )
 
@@ -15,8 +17,20 @@ class Settings(BaseSettings):
     redis_url: str
     ollama_base_url: str
     comfyui_base_url: str
-    breezyvoice_base_url: str
-    breezyvoice_token: str = ""
+    breezyvoice_base_url: str = Field(
+        validation_alias=AliasChoices(
+            "breezyvoice_base_url",
+            "BREEZYVOICE_BASE_URL",
+            "BREEZYVOICE_URL",
+        )
+    )
+    breezyvoice_token: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "breezyvoice_token",
+            "BREEZYVOICE_TOKEN",
+        ),
+    )
     embedding_model: str
     model_name: str
     log_level: str = "INFO"

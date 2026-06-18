@@ -26,6 +26,50 @@ def test_settings_loads_from_env(monkeypatch):
     assert s.log_level == "DEBUG"
 
 
+def test_settings_accepts_breezyvoice_url_alias(monkeypatch):
+    env = {
+        "telegram_token": "test-token",
+        "postgres_url": "postgresql://user:pass@localhost/db",
+        "redis_url": "redis://localhost:6379/0",
+        "ollama_base_url": "http://localhost:11434",
+        "comfyui_base_url": "http://localhost:8188",
+        "BREEZYVOICE_URL": "https://breezyvoice.momooai.com",
+        "BREEZYVOICE_TOKEN": "secret-token",
+        "embedding_model": "BAAI/bge-m3",
+        "model_name": "test-model",
+    }
+    for key in ["breezyvoice_base_url", "BREEZYVOICE_BASE_URL"]:
+        monkeypatch.delenv(key, raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+
+    s = Settings()
+    assert s.breezyvoice_base_url == "https://breezyvoice.momooai.com"
+    assert s.breezyvoice_token == "secret-token"
+
+
+def test_settings_ignores_empty_breezyvoice_alias_values(monkeypatch):
+    env = {
+        "telegram_token": "test-token",
+        "postgres_url": "postgresql://user:pass@localhost/db",
+        "redis_url": "redis://localhost:6379/0",
+        "ollama_base_url": "http://localhost:11434",
+        "comfyui_base_url": "http://localhost:8188",
+        "breezyvoice_base_url": "",
+        "BREEZYVOICE_URL": "https://breezyvoice.momooai.com",
+        "breezyvoice_token": "",
+        "BREEZYVOICE_TOKEN": "secret-token",
+        "embedding_model": "BAAI/bge-m3",
+        "model_name": "test-model",
+    }
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+
+    s = Settings()
+    assert s.breezyvoice_base_url == "https://breezyvoice.momooai.com"
+    assert s.breezyvoice_token == "secret-token"
+
+
 def test_settings_missing_required_raises(monkeypatch):
     # Clear all application env vars.
     for key in [
