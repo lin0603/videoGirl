@@ -66,6 +66,15 @@ class Settings(BaseSettings):
     mini_app_allowed_origins: str = "*"
     mini_app_init_data_max_age_seconds: int = 86400
 
+    # --- Referral funnel (task #23) ---
+    # Credits granted to referrer when referred user completes age verification.
+    referral_reward_credits: int = 20
+    # Optional SFW teaser channel id (e.g. @videogirl_official or numeric -100xxx).
+    # If set, the proactive engine will auto-post SFW teasers with deep-link buttons.
+    referral_channel_id: str = ""
+    # Bot username (without @) for deep-link generation.
+    bot_username: str = ""
+
     # --- GPU media queue (task #8) ---
     # URL workers POST completed media to (Tailscale-reachable Coolify endpoint).
     # e.g. http://100.x.x.x:3000/internal/media_done

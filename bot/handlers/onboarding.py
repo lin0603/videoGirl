@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.keyboards import nsfw_opt_in_keyboard
 from bot.states import OnboardingState
 from shared.logging import get_logger
+from shared.referral import maybe_grant_referral_reward
 from shared.repositories.user_repo import UserRepository
 
 logger = get_logger("bot.onboarding")
@@ -67,6 +68,9 @@ def get_router() -> Router:
             birth_year=birth_year,
             age=age,
         )
+
+        # Grant referral reward to whoever invited this user (if any).
+        await maybe_grant_referral_reward(session, message.from_user.id)
 
         await state.set_state(OnboardingState.nsfw_opt_in)
         await message.answer(

@@ -229,6 +229,27 @@ class Voice(Base):
     )
 
 
+class Referral(Base):
+    """Deep-link referral attribution + reward tracking (task #23)."""
+
+    __tablename__ = "referrals"
+
+    referred_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.telegram_id"), primary_key=True
+    )
+    referrer_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.telegram_id"), nullable=True, index=True
+    )
+    source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reward_given_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+
+    referred: Mapped["User"] = relationship("User", foreign_keys=[referred_id])
+    referrer: Mapped["User | None"] = relationship("User", foreign_keys=[referrer_id])
+
+
 class Persona(Base):
     """Admin-managed character persona."""
 

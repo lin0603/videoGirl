@@ -9,6 +9,7 @@ from bot.handlers.onboarding import start_onboarding
 from bot.states import OnboardingState
 from shared.logging import get_logger
 from shared.mood import MoodService
+from shared.referral import parse_start_payload, record_referral
 from shared.reminders import ReminderParseError, ReminderService
 from shared.repositories.user_repo import UserRepository
 from shared.repositories.voice_repo import VoiceRepository
@@ -21,6 +22,19 @@ def get_router() -> Router:
 
     @router.message(Command("start"))
     async def cmd_start(message: types.Message, state: FSMContext, session: AsyncSession) -> None:
+        # Parse deep-link payload (e.g. /start ref123456789)
+        parts = (message.text or "").split(maxsplit=1)
+        payload_str = parts[1].strip() if len(parts) > 1 else ""
+        if payload_str:
+            payload = parse_start_payload(payload_str)
+            # Record attribution before onboarding (user might be new)
+            await record_referral(
+                session,
+                referrer_id=payload.referrer_id,
+                referred_id=message.from_user.id,
+                source=payload.source,
+            )
+
         await state.set_state(OnboardingState.age_gate)
         await start_onboarding(message, state, session)
 
@@ -252,5 +266,23 @@ def get_router() -> Router:
             await message.answer("找不到這個提醒，或已經取消了。")
             return
         await message.answer(f"已取消提醒：{cancelled.content}")
+
+    @router.message(Command("refer"))
+    async def cmd_refer(message: types.Message) -> None:
+        from shared.referral import make_deep_link
+        from shared.config import get_settings
+        bot_username = get_settings().bot_username
+        if not bot_username:
+            await message.answer(
+                "推薦功能還在設定中，請稍後再試。"
+            )
+            return
+        link = make_deep_link(bot_username, message.from_user.id)
+        await message.answer(
+            f"📣 邀請朋友加入，你每邀請一個成功啟用的朋友就可以獲得 20 點數！\n\n"
+            f"你的專屬邀請連結：\n{link}\n\n"
+            "分享給朋友，等他完成年齡驗證後點數就會自動入帳 💰",
+            disable_web_page_preview=True,
+        )
 
     return router
