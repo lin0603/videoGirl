@@ -9,6 +9,7 @@ from shared.logging import configure_logging, get_logger
 from bot.handlers import chat, commands, onboarding
 from bot.middlewares.db_session import DbSessionMiddleware
 from bot.middlewares.rate_limit import RateLimitMiddleware
+from shared.db import db
 
 
 configure_logging()
@@ -41,7 +42,9 @@ async def start_bot() -> None:
     bot = create_bot()
     dp = create_dispatcher()
     logger.info("bot_starting")
+    await db.connect()
     try:
         await dp.start_polling(bot)
     finally:
+        await db.disconnect()
         await bot.session.close()
