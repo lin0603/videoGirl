@@ -1,6 +1,8 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+ENV UV_LINK_MODE=copy
+ENV UV_PYTHON_DOWNLOADS=never
 
 # Install uv, curl for healthchecks, and ffmpeg for voice conversion.
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates ffmpeg \
