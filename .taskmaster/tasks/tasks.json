@@ -105,7 +105,7 @@
         "id": "8",
         "title": "GPU media job queue + model load/unload manager (Redis + Celery/RQ)",
         "description": "Redis-backed job queue that serializes the rented 4090's media work (images, video), prioritizes photo over video, and manages VRAM-aware load/unload between ComfyUI and the video model. LLM is NOT in this queue (it runs on the Mac mini).",
-        "status": "done",
+        "status": "in-progress",
         "dependencies": [
           "3",
           "6"
@@ -114,7 +114,7 @@
         "details": "Serializes 4090 media work only. Celery or RQ on Redis. Priority lanes: photo > video (batch). VRAM manager unloads ComfyUI before loading the video model and reloads after, to fit 24GB. Worker reached over Tailscale (4090 is remote/disposable; queue must tolerate the GPU being offline and resume when it returns). Job status tracking + async delivery callback to the bot. Backpressure + retries + dead-letter.",
         "testStrategy": "Submitting a photo job loads ComfyUI and returns an image; a video job yields to photo priority; VRAM never overflows 24GB during model swaps; jobs queued while the 4090 is offline run when it reconnects; failed jobs retry then dead-letter.",
         "subtasks": [],
-        "updatedAt": "2026-06-18T16:34:08.120Z"
+        "updatedAt": "2026-06-19T00:21:32.354Z"
       },
       {
         "id": "9",
@@ -338,7 +338,7 @@
         "id": "24",
         "title": "遊戲化親密度",
         "description": "Intimacy/affinity levels + daily streak; levels gate more-intimate content.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "5",
           "6",
@@ -348,7 +348,7 @@
         "details": "intimacy_level + affection_score + streak_days on user_relationships (#5). Daily interaction raises streak; inactivity decays. Levels unlock more intimate content/replies. Complements the mood model (#32). Surface progress in chat and Mini App.",
         "testStrategy": "Daily interaction increments streak; reaching a level unlocks gated content; long inactivity decays score.",
         "subtasks": [],
-        "updatedAt": "2026-06-18T23:16:59.447Z"
+        "updatedAt": "2026-06-18T23:28:26.464Z"
       },
       {
         "id": "25",
@@ -492,7 +492,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-06-18T23:16:59.447Z",
+      "lastModified": "2026-06-19T00:21:32.354Z",
       "taskCount": 33,
       "completedCount": 31,
       "tags": [

@@ -99,6 +99,36 @@ async def update_job(job: MediaJob) -> None:
     await r.set(_JOB_PREFIX + job.job_id, json.dumps(asdict(job)), ex=_JOB_TTL)
 
 
+async def requeue_job(job: MediaJob, *, front: bool = False) -> None:
+    """Push a job back to its type queue (front=True inserts at the head)."""
+    job.status = "queued"
+    r = await _get_redis()
+    await update_job(job)
+    queue = PHOTO_QUEUE if job.job_type == "image" else VIDEO_QUEUE
+    if front:
+        await r.lpush(queue, job.job_id)
+    else:
+        await r.rpush(queue, job.job_id)
+
+
+async def dead_letter(job: MediaJob, error: str) -> None:
+    """Move a permanently failed job to the dead-letter queue."""
+    job.status = "dead"
+    job.error = error
+    r = await _get_redis()
+    await update_job(job)
+    await r.rpush(DEAD_QUEUE, job.job_id)
+
+
+async def mark_job_status(job: MediaJob, status: str, *, result_url: str | None = None, error: str | None = None) -> None:
+    job.status = status
+    if result_url is not None:
+        job.params["result_url"] = result_url
+    if error is not None:
+        job.error = error
+    await update_job(job)
+
+
 async def queue_lengths() -> dict[str, int]:
     r = await _get_redis()
     photo = await r.llen(PHOTO_QUEUE)

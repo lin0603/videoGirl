@@ -1,7 +1,7 @@
 """Tests for the proactive CARE engine."""
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -32,15 +32,12 @@ async def test_quiet_hour_blocks_message(db_session):
     bot = MagicMock()
     bot.send_message = AsyncMock()
     engine = ProactiveEngine(bot, session_factory=lambda: db_session)
+    engine._generate_message = AsyncMock(return_value="test")
 
     # Force local time to 23:30 (quiet hour)
-    async def tick_at(hour):
-        original = ZoneInfo("Asia/Taipei")
-        now_local = datetime.now(original).replace(hour=hour, minute=0, second=0, microsecond=0)
-        # just call maybe_send directly with mocked local_now
-        pass
-
-    sent = await engine._maybe_send_to_user(db_session, user)
+    quiet_local = datetime(2026, 1, 1, 23, 30, tzinfo=ZoneInfo("Asia/Taipei"))
+    with patch("shared.proactive._local_now", return_value=quiet_local):
+        sent = await engine._maybe_send_to_user(db_session, user)
     assert sent is False
     bot.send_message.assert_not_awaited()
 
@@ -62,9 +59,12 @@ async def test_frequency_cap_blocks_message(db_session):
     bot = MagicMock()
     bot.send_message = AsyncMock()
     engine = ProactiveEngine(bot, session_factory=lambda: db_session)
+    engine._generate_message = AsyncMock(return_value="test")
 
     # 12:00 UTC is not quiet, but frequency cap applies.
-    sent = await engine._maybe_send_to_user(db_session, user)
+    noon_local = datetime(2026, 1, 1, 12, 0, tzinfo=ZoneInfo("Etc/UTC"))
+    with patch("shared.proactive._local_now", return_value=noon_local):
+        sent = await engine._maybe_send_to_user(db_session, user)
     assert sent is False
     bot.send_message.assert_not_awaited()
 
@@ -75,8 +75,7 @@ async def test_care_prompt_selected_after_silence(db_session):
         telegram_id=402, username="tester", display_name="Tester"
     )
     user.age_verified_at = _utc_now()
-    # Choose a timezone where the current UTC time falls in the care-check window (11-21).
-    user.timezone = "Pacific/Auckland"
+    user.timezone = "Etc/UTC"
     await db_session.commit()
 
     mood = await MoodRepository(db_session).get_or_create(user.telegram_id, "xiaorou")
@@ -86,11 +85,12 @@ async def test_care_prompt_selected_after_silence(db_session):
     bot = MagicMock()
     bot.send_message = AsyncMock()
     engine = ProactiveEngine(bot, session_factory=lambda: db_session)
-
-    # Mock generation to avoid LLM calls
     engine._generate_message = AsyncMock(return_value="你在做什麼呀？")
 
-    sent = await engine._maybe_send_to_user(db_session, user)
+    # 15:00 UTC falls in the care-check window and there has been 5h of silence.
+    afternoon_local = datetime(2026, 1, 1, 15, 0, tzinfo=ZoneInfo("Etc/UTC"))
+    with patch("shared.proactive._local_now", return_value=afternoon_local):
+        sent = await engine._maybe_send_to_user(db_session, user)
     assert sent is True
     bot.send_message.assert_awaited_once()
 
@@ -114,7 +114,6 @@ async def test_morning_prompt_selected(db_session):
     bot = MagicMock()
     bot.send_message = AsyncMock()
     engine = ProactiveEngine(bot, session_factory=lambda: db_session)
-
     engine._generate_message = AsyncMock(return_value="早安～")
 
     # Manually choose prompt at 9 AM local

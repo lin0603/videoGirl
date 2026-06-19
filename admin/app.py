@@ -16,7 +16,10 @@ from miniapp.app import register_mini_app
 from repositories import admin_repo as repo
 from shared.config import get_settings
 from shared.db import AsyncSessionLocal
+from shared.logging import get_logger
 from shared.models import Persona, Voice, VoiceCategory
+
+logger = get_logger("admin.app")
 
 app = FastAPI(title="videoGirl Admin")
 templates = Jinja2Templates(directory="admin/templates")
@@ -667,6 +670,57 @@ async def media_done_callback(
             job.user_id,
             BufferedInputFile(data, filename=file.filename or "video.mp4"),
         )
+
+    job.status = "done"
+    await update_job(job)
+    return {"ok": True, "job_id": job_id}
+
+
+@app.post("/internal/media_done_url")
+async def media_done_url_callback(request: Request) -> dict:
+    """
+    Alternative callback that receives a JSON payload with a result_url,
+    downloads the media, and delivers it to the user.
+    """
+    _verify_callback_secret(request)
+
+    import httpx
+    from aiogram.types import BufferedInputFile
+    from workers.queue_client import get_job, update_job
+
+    payload = await request.json()
+    job_id = payload.get("job_id")
+    result_url = payload.get("result_url")
+    if not job_id or not result_url:
+        raise HTTPException(status_code=422, detail="missing job_id or result_url")
+
+    job = await get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="job not found")
+
+    bot = getattr(request.app.state, "bot", None)
+    if bot is None:
+        raise HTTPException(status_code=503, detail="bot not available")
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.get(result_url)
+            resp.raise_for_status()
+            data = resp.content
+    except Exception as exc:
+        logger.exception("media_download_failed", job_id=job_id, error=str(exc))
+        raise HTTPException(status_code=502, detail="failed to fetch media") from exc
+
+    filename = "image.jpg" if job.job_type == "image" else "video.mp4"
+    if job.job_type == "image":
+        await bot.send_photo(job.user_id, BufferedInputFile(data, filename=filename))
+        try:
+            from shared.media_store import store_last_photo
+            await store_last_photo(job.user_id, data)
+        except Exception:
+            pass
+    else:
+        await bot.send_video(job.user_id, BufferedInputFile(data, filename=filename))
 
     job.status = "done"
     await update_job(job)
