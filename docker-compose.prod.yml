@@ -31,7 +31,7 @@ services:
   worker:
     image: ghcr.io/lin0603/videogirl:main
     container_name: videogirl-worker
-    command: python -m workers.worker
+    command: /app/.venv/bin/python -m workers.worker
     environment:
       telegram_token: ${telegram_token:-}
       postgres_url: postgresql://videogirl:${POSTGRES_PASSWORD:-videogirl}@postgres:5432/videogirl
