@@ -84,6 +84,18 @@ class Settings(BaseSettings):
     # Max retries before a job is dead-lettered.
     media_max_retries: int = 3
 
+    # --- ComfyUI Station Gateway (task #10) ---
+    # 4090 上的 gateway URL，worker 由此統一呼叫，不再直接打原生 ComfyUI。
+    comfyui_gateway_url: str = "http://127.0.0.1:9188"
+    # 須與 comfyui-station/.env 的 STATION_TOKEN 一致。
+    comfyui_gateway_token: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "comfyui_gateway_token",
+            "COMFYUI_GATEWAY_TOKEN",
+        ),
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

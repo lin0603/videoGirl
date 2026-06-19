@@ -113,6 +113,25 @@ async def test_enqueue_video_job_uses_video_queue(fake_redis):
 
 
 @pytest.mark.asyncio
+async def test_enqueue_image_job_stores_gateway_capability(fake_redis):
+    with patch("workers.queue_client._get_redis", new=AsyncMock(return_value=fake_redis)):
+        job_id = await enqueue_image_job(
+            user_id=111,
+            callback_url="http://coolify/internal/media_done",
+            capability="t2i",
+            gen_params={"prompt": "a girl"},
+            images={},
+        )
+
+    stored = json.loads(fake_redis._store[f"mediajob:{job_id}"])
+    assert stored["capability"] == "t2i"
+    assert stored["gen_params"]["prompt"] == "a girl"
+    assert stored["images"] == {}
+    assert stored["job_type"] == "image"
+    assert job_id in fake_redis._lists.get(PHOTO_QUEUE, [])
+
+
+@pytest.mark.asyncio
 async def test_get_job_returns_none_for_missing(fake_redis):
     with patch("workers.queue_client._get_redis", new=AsyncMock(return_value=fake_redis)):
         result = await get_job("nonexistent-id")
@@ -214,6 +233,58 @@ def test_execute_job_dead_letters_after_max_retries():
     push_calls = [c[0][0] for c in r.rpush.call_args_list]
     assert DEAD_QUEUE in push_calls
     assert "media:photo" not in push_calls
+
+
+def test_execute_job_gateway_capability_posts_multipart_callback():
+    """task #10：有 capability 的照片任務走 gateway，並維持 /internal/media_done 回推格式。"""
+    job = {
+        "job_id": "gw-job",
+        "user_id": 1,
+        "job_type": "image",
+        "capability": "t2i",
+        "gen_params": {"prompt": "a girl"},
+        "images": {},
+        "callback_url": "http://coolify/internal/media_done",
+        "status": "queued",
+        "retry_count": 0,
+        "error": None,
+    }
+    r = _make_redis_mock(job)
+
+    fake_post_response = MagicMock()
+    fake_post_response.raise_for_status = lambda: None
+
+    with patch(
+        "shared.comfyui_gateway.generate_sync",
+        return_value={
+            "outputs": [
+                {"url": "http://gw/outputs/out.jpg", "type": "image", "filename": "out.jpg"},
+            ],
+        },
+    ) as mock_generate, \
+         patch("shared.comfyui_gateway.download_output_sync", return_value=b"imgdata") as mock_download, \
+         patch("httpx.post", return_value=fake_post_response) as mock_post:
+        execute_job(
+            job,
+            comfyui_base_url="http://comfyui",
+            redis_client=r,
+            callback_secret="s",
+            max_retries=3,
+        )
+
+    mock_generate.assert_called_once_with(
+        "t2i",
+        {"prompt": "a girl"},
+        {},
+        wait=True,
+        timeout=600.0,
+    )
+    mock_download.assert_called_once_with("http://gw/outputs/out.jpg", timeout=120.0)
+    mock_post.assert_called_once()
+    call_kwargs = mock_post.call_args.kwargs
+    assert call_kwargs["data"]["job_id"] == "gw-job"
+    assert call_kwargs["files"]["file"][0] == "out.jpg"
+    assert call_kwargs["headers"]["Authorization"] == "Bearer s"
 
 
 def test_execute_job_video_retries_to_video_queue():

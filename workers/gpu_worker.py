@@ -14,6 +14,7 @@ from typing import Any
 
 import httpx
 
+from shared.comfyui_gateway import GatewayError
 from shared.config import get_settings
 from shared.logging import configure_logging, get_logger
 from shared.redis import redis_client
@@ -88,7 +89,26 @@ class ImageProcessor(MediaProcessor):
             logger.info("image_process_stub", job_id=job.job_id)
             await asyncio.sleep(0.01)
             return f"https://example.com/stub-image-{job.job_id}.jpg"
-        # TODO: call ComfyUI API with job.workflow and job.params.
+
+        # task #10：照片優先走 gateway capability；無 capability 的 legacy 任務保留 NotImplementedError。
+        if job.capability:
+            from shared.comfyui_gateway import generate
+
+            result = await generate(
+                job.capability,
+                job.gen_params or {},
+                job.images or None,
+                wait=True,
+                timeout=600.0,
+            )
+            outputs = result.get("outputs") or []
+            if not outputs:
+                raise GatewayError(
+                    "Gateway job produced no outputs",
+                    detail=result.get("error"),
+                )
+            return outputs[0]["url"]
+
         raise NotImplementedError("ComfyUI integration not configured")
 
 

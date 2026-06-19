@@ -23,12 +23,16 @@ class MediaJob:
     job_id: str
     user_id: int
     job_type: str  # "image" | "video"
-    workflow: str  # relative to infra/comfyui/workflows/, e.g. "t2i/zimage-t2i.api.json"
-    params: dict[str, Any]  # ComfyUI node overrides: {"<node_id>.<input>": value}
-    callback_url: str
+    workflow: str = ""  # relative to infra/comfyui/workflows/, e.g. "t2i/zimage-t2i.api.json"
+    params: dict[str, Any] = field(default_factory=dict)  # 原生 ComfyUI 節點覆寫（影片仍用）
+    callback_url: str = ""
     status: str = "queued"  # queued | started | done | failed | dead
     retry_count: int = 0
     error: str | None = None
+    # task #10：照片改走 gateway capability，與舊 workflow/params 向後相容。
+    capability: str | None = None
+    gen_params: dict[str, Any] = field(default_factory=dict)
+    images: dict[str, str] = field(default_factory=dict)
 
 
 async def _get_redis():
@@ -39,19 +43,30 @@ async def _get_redis():
 async def enqueue_image_job(
     *,
     user_id: int,
-    workflow: str,
-    params: dict[str, Any],
+    workflow: str = "",
+    params: dict[str, Any] | None = None,
     callback_url: str,
+    capability: str | None = None,
+    gen_params: dict[str, Any] | None = None,
+    images: dict[str, str] | None = None,
 ) -> str:
-    """Enqueue a photo-generation job (high-priority lane). Returns job_id."""
+    """
+    Enqueue a photo-generation job (high-priority lane). Returns job_id.
+
+    task #10：新增 capability/gen_params/images 以支援 gateway；
+    未提供時仍走舊的 workflow/params，保持向後相容。
+    """
     job_id = str(uuid.uuid4())
     job = MediaJob(
         job_id=job_id,
         user_id=user_id,
         job_type="image",
         workflow=workflow,
-        params=params,
+        params=params or {},
         callback_url=callback_url,
+        capability=capability,
+        gen_params=gen_params or {},
+        images=images or {},
     )
     r = await _get_redis()
     pipe = r.pipeline()

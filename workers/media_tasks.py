@@ -10,6 +10,7 @@ import uuid
 import httpx
 import redis as sync_redis
 
+from shared.comfyui_gateway import GatewayError
 from workers.comfyui_runner import (
     ComfyUIError,
     apply_params,
@@ -49,6 +50,43 @@ def execute_job(
     _update_redis(redis_client, job_id, status="started")
 
     try:
+        # task #10：照片改走 ComfyUI Station Gateway；影片與無 capability 的任務維持原生 ComfyUI。
+        capability = job_data.get("capability")
+        if capability:
+            from shared.comfyui_gateway import download_output_sync, generate_sync
+
+            gen_params = dict(job_data.get("gen_params") or {})
+            images = dict(job_data.get("images") or {})
+            result = generate_sync(
+                capability,
+                gen_params,
+                images,
+                wait=True,
+                timeout=600.0,
+            )
+            outputs = result.get("outputs") or []
+            if not outputs:
+                raise GatewayError(
+                    "Gateway job produced no outputs",
+                    detail=result.get("error"),
+                )
+
+            output = outputs[0]
+            result_url = output["url"]
+            file_bytes = download_output_sync(result_url, timeout=120.0)
+            filename = output.get("filename", "output.jpg")
+
+            resp = httpx.post(
+                job_data["callback_url"],
+                headers={"Authorization": f"Bearer {callback_secret}"},
+                data={"job_id": job_id},
+                files={"file": (filename, file_bytes)},
+                timeout=60,
+            )
+            resp.raise_for_status()
+            _update_redis(redis_client, job_id, status="done")
+            return
+
         workflow_path = f"infra/comfyui/workflows/{job_data['workflow']}"
         workflow = load_workflow(workflow_path)
         params = dict(job_data.get("params") or {})
