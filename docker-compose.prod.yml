@@ -16,8 +16,38 @@ services:
       BREEZYVOICE_URL: ${BREEZYVOICE_URL:-}
       breezyvoice_token: ${breezyvoice_token:-}
       BREEZYVOICE_TOKEN: ${BREEZYVOICE_TOKEN:-}
+      # task #10: media pipeline — bot enqueues photo jobs; worker delivers via this callback.
+      media_callback_url: ${media_callback_url:-http://app:3000/internal/media_done}
+      media_callback_secret: ${media_callback_secret:-}
+      comfyui_gateway_url: ${comfyui_gateway_url:-http://192.168.0.140:9188}
+      comfyui_gateway_token: ${comfyui_gateway_token:-}
     depends_on:
       - postgres
+      - redis
+    restart: unless-stopped
+
+  # task #10: GPU media worker — consumes the Redis photo/video queue and calls the
+  # ComfyUI Station Gateway (on the 4090, reached via the Coolify→4090 autossh tunnel).
+  worker:
+    image: ghcr.io/lin0603/videogirl:main
+    container_name: videogirl-worker
+    command: python -m workers.worker
+    environment:
+      telegram_token: ${telegram_token:-}
+      postgres_url: postgresql://videogirl:${POSTGRES_PASSWORD:-videogirl}@postgres:5432/videogirl
+      redis_url: redis://redis:6379/0
+      REDIS_URL: redis://redis:6379/0
+      ollama_base_url: ${ollama_base_url:-http://127.0.0.1:11434}
+      comfyui_base_url: ${comfyui_base_url:-http://127.0.0.1:8188}
+      embedding_model: ${embedding_model:-BAAI/bge-m3}
+      model_name: ${model_name:-}
+      comfyui_gateway_url: ${comfyui_gateway_url:-http://192.168.0.140:9188}
+      comfyui_gateway_token: ${comfyui_gateway_token:-}
+      media_callback_secret: ${media_callback_secret:-}
+      CALLBACK_SECRET: ${media_callback_secret:-}
+      MAX_RETRIES: "3"
+      BLPOP_TIMEOUT: "30"
+    depends_on:
       - redis
     restart: unless-stopped
 
