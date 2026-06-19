@@ -48,6 +48,17 @@ class VoiceError(RuntimeError):
 def tts_clean_text(t: str) -> str:
     """Clean text for TTS: symbols to spoken words, remove bullets, etc."""
     s = (t or "")
+    # 角色扮演的動作/神情描述放在括號或星號內，不應被唸出來。
+    # 例：（臉頰瞬間泛起紅暈，眼神閃爍著羞澀與期待）、(順手拉過你的手) 等。
+    s = re.sub(r"（[^（）]*）", "", s)      # 全形括號
+    s = re.sub(r"\([^()]*\)", "", s)        # 半形括號
+    s = re.sub(r"【[^【】]*】", "", s)      # 全形方括號
+    s = re.sub(r"\*[^*\n]+\*", "", s)       # *動作* markdown
+    # 移除殘留的純表情符號（避免 TTS 亂唸），保留中英數與標點。
+    s = re.sub(r"[\U0001F000-\U0001FAFF☀-➿️❤]", "", s)
+    # 清掉因刪除而產生的重複/開頭標點。
+    s = re.sub(r"([，。！？～、])\1+", r"\1", s)
+    s = re.sub(r"^[\s，。！？～、~]+", "", s)
     # Math / punctuation to spoken Chinese
     s = s.replace("＝", " 等於 ").replace("=", " 等於 ")
     s = s.replace("×", " 乘以 ")
