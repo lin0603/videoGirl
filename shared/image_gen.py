@@ -36,6 +36,12 @@ _NSFW_PROMPT = (
     "1girl, solo, nsfw, topless, TaiwanDollLikeness"
 )
 
+# 預設負面提示詞（task #10：washout capability 必填 negative）。
+_DEFAULT_NEGATIVE = (
+    "lowres, bad anatomy, bad hands, text, watermark, logo, blurry, "
+    "worst quality, jpeg artifacts, deformed, ugly, censored"
+)
+
 # Default workflow paths.
 _WORKFLOW_ZIMAGE = "t2i/zimage-t2i.api.json"
 _WORKFLOW_SDXL_LORA = "t2i/sdxl-lora-t2i.api.json"
@@ -122,14 +128,16 @@ async def request_photo(
     extra_context: str = "",
     scene: str | None = None,
     persona_slug: str | None = None,
+    source_image_url: str | None = None,
 ) -> str | None:
     """
-    Enqueue a photo-generation job.
+    Enqueue a photo-generation job via ComfyUI Station Gateway.
 
-    If `scene` is given and persona has a LoRA, uses scene templates + SDXL workflow.
-    Otherwise falls back to the ZImage default workflow.
+    - 無來源圖 → capability="t2i"
+    - 有來源圖 → capability="washout"，images={"source": <url>}
 
-    Returns job_id if queued, None if media_callback_url is not configured.
+    保留 SFW 預設、nsfw opt-in 與 hard-block 檢查。
+    回傳 job_id；若 media_callback_url 未設定則回傳 None。
     """
     settings = get_settings()
     if not settings.media_callback_url:
@@ -138,8 +146,11 @@ async def request_photo(
     cfg = persona_image_config(persona_slug)
     seed = random.randint(1, 2**31 - 1)
 
-    # Try scene template path when we have a scene key or a LoRA.
-    if scene or cfg.lora_name:
+    # 決定 gateway capability：有來源圖就洗圖，否則文生圖。
+    capability = "washout" if source_image_url else "t2i"
+
+    # 優先使用 scene template；persona 的 lora_trigger 會透過 template 插入 prompt。
+    if scene or cfg.lora_trigger:
         from shared.scene_templates import build_prompt
         key = scene or ("topless" if nsfw else "selfie")
         result = build_prompt(key, lora_trigger=cfg.lora_trigger, extra=extra_context, nsfw_ok=nsfw)
@@ -147,31 +158,35 @@ async def request_photo(
             positive, negative = result
             if not check_image_prompt(positive, user_id=user_id).allowed:
                 return None
-            if cfg.lora_name:
-                params = _build_lora_params(cfg, positive, negative, seed)
-                workflow = cfg.workflow
-            else:
-                params = _build_zimage_params(positive, seed)
-                workflow = _WORKFLOW_ZIMAGE
+            gen_params: dict[str, object] = {"prompt": positive, "seed": seed}
+            images: dict[str, str] = {}
+            if capability == "washout":
+                gen_params["negative"] = negative
+                images["source"] = source_image_url
             return await enqueue_image_job(
                 user_id=user_id,
-                workflow=workflow,
-                params=params,
                 callback_url=settings.media_callback_url,
+                capability=capability,
+                gen_params=gen_params,
+                images=images,
             )
 
-    # Default ZImage path.
+    # 預設 prompt 路徑。
     base = _NSFW_PROMPT if nsfw else _SFW_PROMPT
     prompt = f"{base}, {extra_context}".rstrip(", ") if extra_context else base
     if not check_image_prompt(prompt, user_id=user_id).allowed:
         return None
 
+    gen_params = {"prompt": prompt, "seed": seed}
+    images = {}
+    if capability == "washout":
+        gen_params["negative"] = _DEFAULT_NEGATIVE
+        images["source"] = source_image_url
+
     return await enqueue_image_job(
         user_id=user_id,
-        workflow=_WORKFLOW_ZIMAGE,
-        params={
-            "4.prompt": prompt,
-            "6.seed": seed,
-        },
         callback_url=settings.media_callback_url,
+        capability=capability,
+        gen_params=gen_params,
+        images=images,
     )

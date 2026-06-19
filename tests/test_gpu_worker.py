@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from workers.gpu_worker import GPUWorker, VRAMManager
+from workers.gpu_worker import GPUWorker, ImageProcessor, VRAMManager
 from workers.queue_client import MediaJob
 
 
@@ -85,3 +85,57 @@ async def test_worker_retries_then_dead_letters():
     # max_retries=1 means first failure -> dead letter.
     mock_dead.assert_awaited_once()
     mock_requeue.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_image_processor_calls_gateway_for_capability_job():
+    job = MediaJob(
+        job_id="job-gw",
+        user_id=100,
+        job_type="image",
+        capability="t2i",
+        gen_params={"prompt": "a girl"},
+        callback_url="http://callback",
+    )
+
+    with (
+        patch("workers.gpu_worker.STUB_MODE", False),
+        patch("shared.comfyui_gateway.generate", new=AsyncMock(
+            return_value={
+                "outputs": [
+                    {"url": "http://gw/outputs/out.jpg", "type": "image", "filename": "out.jpg"},
+                ],
+            },
+        )) as mock_generate,
+    ):
+        result = await ImageProcessor().run(job)
+
+    assert result == "http://gw/outputs/out.jpg"
+    mock_generate.assert_awaited_once_with(
+        "t2i",
+        {"prompt": "a girl"},
+        None,
+        wait=True,
+        timeout=600.0,
+    )
+
+
+@pytest.mark.asyncio
+async def test_image_processor_raises_when_gateway_has_no_outputs():
+    job = MediaJob(
+        job_id="job-gw-empty",
+        user_id=100,
+        job_type="image",
+        capability="t2i",
+        gen_params={"prompt": "a girl"},
+        callback_url="http://callback",
+    )
+
+    with (
+        patch("workers.gpu_worker.STUB_MODE", False),
+        patch("shared.comfyui_gateway.generate", new=AsyncMock(
+            return_value={"outputs": [], "error": "pipeline failed"},
+        )),
+        pytest.raises(Exception),
+    ):
+        await ImageProcessor().run(job)

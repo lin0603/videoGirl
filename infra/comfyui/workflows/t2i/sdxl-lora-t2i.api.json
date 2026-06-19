@@ -2,7 +2,7 @@
   "1": {
     "class_type": "CheckpointLoaderSimple",
     "inputs": {
-      "ckpt_name": "dreamshaper_8.safetensors"
+      "ckpt_name": "chilloutmix-Ni.safetensors"
     }
   },
   "2": {
@@ -10,7 +10,7 @@
     "inputs": {
       "model": ["1", 0],
       "clip": ["1", 1],
-      "lora_name": "persona_default.safetensors",
+      "lora_name": "sd15/taiwanDollLikeness_v20.safetensors",
       "strength_model": 0.8,
       "strength_clip": 0.8
     }
@@ -32,8 +32,8 @@
   "5": {
     "class_type": "EmptyLatentImage",
     "inputs": {
-      "width": 832,
-      "height": 1216,
+      "width": 512,
+      "height": 768,
       "batch_size": 1
     }
   },

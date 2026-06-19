@@ -38,7 +38,13 @@ def main() -> None:
     max_retries = int(os.environ.get("MAX_RETRIES", "3"))
     blpop_timeout = int(os.environ.get("BLPOP_TIMEOUT", "30"))
 
-    r = sync_redis.from_url(redis_url, decode_responses=True)
+    r = sync_redis.from_url(
+        redis_url,
+        decode_responses=True,
+        socket_timeout=blpop_timeout + 15,
+        socket_keepalive=True,
+        health_check_interval=30,
+    )
     r.ping()
     print(f"[worker] connected redis={redis_url} comfyui={comfyui_url}", flush=True)
 
@@ -53,7 +59,15 @@ def main() -> None:
     signal.signal(signal.SIGINT, _on_signal)
 
     while not shutdown:
-        result = r.blpop(QUEUES, timeout=blpop_timeout)
+        try:
+            result = r.blpop(QUEUES, timeout=blpop_timeout)
+        except sync_redis.exceptions.TimeoutError:
+            continue  # 空佇列的 socket read timeout，視同無工作續迴圈
+        except sync_redis.exceptions.ConnectionError as exc:
+            print(f"[worker] redis connection error: {exc}, retrying", flush=True)
+            import time
+            time.sleep(2)
+            continue
         if result is None:
             continue
 
