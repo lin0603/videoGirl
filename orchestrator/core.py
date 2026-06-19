@@ -38,6 +38,12 @@ async def generate_reply(
     intimacy_context: str = "",
 ) -> str:
     """Build the prompt and get an in-character reply. Degrades on LLM failure."""
+    style = (
+        "\n\n【回覆風格】像在用手機傳訊息給戀人：簡短、口語、有感情。"
+        "整體長度約是平常的三分之一（大約 30～70 字），不要長篇大論。"
+        "可以用換行把回覆拆成 2～3 則很短的訊息（像連續傳訊息那樣），每則一兩句即可。"
+        "動作或神情描述若有，請放在括號內。"
+    )
     messages: list[Message] = [
         {
             "role": "system",
@@ -47,7 +53,7 @@ async def generate_reply(
                 mood_context=mood_context,
                 intimacy_context=intimacy_context,
                 nsfw_enabled=nsfw,
-            ),
+            ) + style,
         }
     ]
     if history:
@@ -55,7 +61,7 @@ async def generate_reply(
     messages.append({"role": "user", "content": user_text})
 
     try:
-        return await get_llm_client().chat(messages, max_tokens=400)
+        return await get_llm_client().chat(messages, max_tokens=200)
     except LLMError as e:
         log.warning("generate_reply_fallback", error=str(e))
         return FALLBACK_REPLY

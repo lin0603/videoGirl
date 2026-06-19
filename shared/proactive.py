@@ -15,9 +15,14 @@ from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+import os
+
 from shared.db import AsyncSessionLocal
 from shared.logging import get_logger
 from shared.memory import build_memory_context
+from shared.messaging import send_bubbles
+from shared.redis import get_redis
+from shared.repositories.subscription_repo import EntitlementService
 from shared.models import CompanionMood, Reminder, User
 from shared.mood import MoodService, format_mood_for_prompt
 from shared.reminders import ReminderService
@@ -41,6 +46,30 @@ MIN_SILENCE = timedelta(hours=3)
 
 # Local timezone for users without explicit setting.
 DEFAULT_TZ = ZoneInfo("Asia/Taipei")
+
+# --- NSFW 主動撩撥（聊到一半突然不回 → 推 3～5 則）---
+# 可用環境變數關閉（預設開啟）。
+NSFW_TEASE_ENABLED = os.environ.get("NSFW_TEASE_ENABLED", "1") == "1"
+# 對方多久沒回才開始撩撥（太短 = 還在打字；太長 = 已離開，跳過）。
+TEASE_IDLE_MIN = timedelta(minutes=4)
+TEASE_IDLE_MAX = timedelta(minutes=20)
+# 同一人撩撥後的冷卻時間（秒）：避免連續轟炸 / 封號風險。
+TEASE_COOLDOWN_SECS = 7200  # 2 小時
+NSFW_IDLE_TTL = 3600  # nsfw_idle 標記存活 1 小時
+_TEASE_INSTRUCTION = (
+    "你正在和對方曖昧、親密地聊天，但他突然不回你了。"
+    "主動傳訊息撩撥他、勾起他的注意，語氣黏人、帶點挑逗與想念、有點欲求不滿的撒嬌。"
+    "傳 3～4 則很短的訊息，每則一句話，用換行分開，不要長篇。"
+)
+
+
+async def mark_nsfw_active(user_id: int) -> None:
+    """在 NSFW 聊天回合後標記『此使用者正在 NSFW 對話』，供 tease tick 偵測閒置。"""
+    try:
+        r = await get_redis()
+        await r.set(f"nsfw_idle:{user_id}", "1", ex=NSFW_IDLE_TTL)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("mark_nsfw_active_failed", user_id=user_id, error=str(exc))
 
 
 @dataclass(frozen=True)
@@ -131,6 +160,15 @@ class ProactiveEngine:
                 id="special_dates_tick",
                 replace_existing=True,
             )
+            # NSFW 主動撩撥：每 2 分鐘掃描閒置中的 NSFW 對話。
+            if NSFW_TEASE_ENABLED:
+                self.scheduler.add_job(
+                    self._nsfw_tease_tick,
+                    "interval",
+                    minutes=2,
+                    id="nsfw_tease_tick",
+                    replace_existing=True,
+                )
             self.scheduler.start()
             logger.info("proactive_engine_started")
 
@@ -274,6 +312,85 @@ class ProactiveEngine:
         except Exception as exc:
             logger.error("reminder_generate_failed", error=str(exc))
             return f"寶貝，記得 {reminder.content} 喔 💕"
+
+    async def _nsfw_tease_tick(self) -> None:
+        """掃描閒置中的 NSFW 對話，對突然不回的人主動撩撥 3～5 則。"""
+        try:
+            r = await get_redis()
+            uids: list[int] = []
+            async for key in r.scan_iter(match="nsfw_idle:*", count=200):
+                try:
+                    uids.append(int(key.split(":", 1)[1]))
+                except (ValueError, IndexError):
+                    continue
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("nsfw_tease_scan_failed", error=str(exc))
+            return
+        if not uids:
+            return
+        async with self.session_factory() as session:
+            for uid in uids:
+                try:
+                    await self._maybe_tease(session, r, uid)
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("nsfw_tease_error", user_id=uid, error=str(exc))
+
+    async def _maybe_tease(self, session: AsyncSession, r, uid: int) -> bool:
+        # 冷卻中 → 跳過（避免轟炸 / 封號）。
+        if await r.exists(f"nsfw_teased:{uid}"):
+            return False
+        user = await UserRepository(session).get_by_telegram_id(uid)
+        if user is None:
+            await r.delete(f"nsfw_idle:{uid}")
+            return False
+        # NSFW 閘門：opt-in + 年齡驗證 + 權限。
+        if not (user.nsfw_opt_in and user.age_verified_at is not None):
+            await r.delete(f"nsfw_idle:{uid}")
+            return False
+        if not await EntitlementService(session).nsfw_allowed(user):
+            await r.delete(f"nsfw_idle:{uid}")
+            return False
+        # 安靜時段不打擾。
+        tz = ZoneInfo(user.timezone) if user.timezone else DEFAULT_TZ
+        if _is_quiet_hour(_local_now(tz)):
+            return False
+        mood = await MoodRepository(session).get_or_create(uid, "xiaorou")
+        if not mood.last_interaction_at:
+            return False
+        silence = datetime.now(timezone.utc) - mood.last_interaction_at
+        if silence < TEASE_IDLE_MIN:
+            return False  # 還太快，可能還在打字
+        if silence > TEASE_IDLE_MAX:
+            await r.delete(f"nsfw_idle:{uid}")  # 已離開太久，這次不撩
+            return False
+
+        text = await self._generate_tease(session, user)
+        if text:
+            await send_bubbles(self.bot, uid, text, max_parts=5, base_delay=1.0)
+        # 設冷卻 + 清除 idle（同一段閒置只撩一次）。
+        await r.set(f"nsfw_teased:{uid}", "1", ex=TEASE_COOLDOWN_SECS)
+        await r.delete(f"nsfw_idle:{uid}")
+        mood.last_proactive_at = datetime.now(timezone.utc)
+        await session.commit()
+        logger.info("nsfw_tease_sent", user_id=uid)
+        return True
+
+    async def _generate_tease(self, session: AsyncSession, user: User) -> str:
+        persona = get_persona(getattr(user, "active_persona_slug", None) or "xiaorou")
+        memory = await build_memory_context(user.telegram_id, "")
+        mood = await MoodService(session).get_mood(user.telegram_id, persona.slug)
+        mood_context = format_mood_for_prompt(mood.phrase)
+        try:
+            return await generate_reply(
+                persona,
+                _TEASE_INSTRUCTION,
+                nsfw=True,
+                memory=memory,
+                mood_context=mood_context,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error("nsfw_tease_generate_failed", error=str(exc))
+            return "在嗎～\n怎麼突然不理人家了…\n人家還想你陪我嘛 🥺"
 
     async def _generate_message(
         self, session: AsyncSession, user: User, prompt: ProactivePrompt

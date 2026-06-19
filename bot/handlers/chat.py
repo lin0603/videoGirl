@@ -8,6 +8,7 @@ from shared.intimacy import IntimacyService, intimacy_prompt_line
 from shared.quota import check_queue_backpressure, check_quota, increment_quota
 from shared.video_gen import build_source_image_url, is_video_request, request_video
 from shared.logging import get_logger
+from shared.messaging import send_bubbles
 from shared.mood import MoodService, format_mood_for_prompt
 from shared.safety import check_prompt, refusal_message
 from shared.repositories.subscription_repo import EntitlementService
@@ -80,7 +81,16 @@ def get_router() -> Router:
             await message.answer("嗯…我這邊有點恍神，可以再跟我說一次嗎？(´；ω；`)")
             return
 
-        await message.answer(reply_text)
+        # 把回覆拆成 2～3 則短訊，像真人連續傳訊息。
+        await send_bubbles(message.bot, message.chat.id, reply_text, max_parts=3)
+
+        # NSFW 對話：標記此使用者正在親密聊天，若突然不回，proactive 引擎會主動撩撥。
+        if nsfw:
+            try:
+                from shared.proactive import mark_nsfw_active
+                await mark_nsfw_active(message.from_user.id)
+            except Exception:
+                pass  # non-critical
 
         # Update intimacy score for each chat interaction (fire-and-forget).
         try:
