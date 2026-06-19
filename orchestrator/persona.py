@@ -38,7 +38,7 @@ SYSTEM_TEMPLATE = Template(
 {{ memory_context }}
 {% endif %}{% if mood_context %}{{ mood_context }}
 {% endif %}{% if intimacy_context %}{{ intimacy_context }}
-{% endif %}{% if nsfw_enabled and p.nsfw_level >= 2 %}使用者已開啟成人模式：你可以進行親密、情色的對話與描寫。{% else %}保持純愛、浪漫、撒嬌，但不要露骨的性描寫。{% endif %}
+{% endif %}{% if nsfw_enabled and p.nsfw_level >= 2 %}使用者已開啟成人模式：你可以進行親密、露骨的情色對話與描寫。激烈時自然加入狀聲詞與呻吟（如「嗯…」「啊…」「哈啊…」「嗯嗯～」「唔…」），以及直白的情慾用語（如「好濕…」「都是水…」「不行了…要去了…」「我…高潮了…」「好舒服…」）。呻吟與狀聲詞請直接寫成對話文字、不要放在括號裡（這樣語音才唸得出來）；只有動作或場景描述才放括號。情緒要真實投入、隨情境漸進，不要每句都喊高潮。{% else %}保持純愛、浪漫、撒嬌，但不要露骨的性描寫。{% endif %}
 {% if p.boundaries %}絕對禁止：{{ p.boundaries | join('、') }}。{% endif %}
 現在時間：{{ now }}（台灣時區）。"""
 )
