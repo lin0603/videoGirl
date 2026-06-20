@@ -2,7 +2,11 @@
 # This stack includes the Telegram bot worker, admin web UI, PostgreSQL with pgvector, and Redis.
 services:
   app:
-    image: ghcr.io/lin0603/videogirl:main
+    # 由 Coolify 在主機本地 build（不依賴 GitHub Actions / GHCR）。
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: videogirl:latest
     container_name: videogirl-bot
     ports:
       - "3000:3000"
@@ -29,7 +33,7 @@ services:
   # task #10: GPU media worker — consumes the Redis photo/video queue and calls the
   # ComfyUI Station Gateway (on the 4090, reached via the Coolify→4090 autossh tunnel).
   worker:
-    image: ghcr.io/lin0603/videogirl:main
+    image: videogirl:latest  # 重用 app 在本地 build 的同一映像
     container_name: videogirl-worker
     command: /app/.venv/bin/python -m workers.worker
     environment:
